@@ -1,0 +1,19 @@
+[build-system]
+requires = ["flit"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "ambforecast"
+description = "Ambulance forecast"
+license = {file = "LICENSE"}
+dynamic = ["version"]
+
+dependencies = [
+  "joblib",
+  "numpy",
+  "pandas",
+  "prophet",
+  "statsmodels"
+]
+
+requires-python = ">=3.10"

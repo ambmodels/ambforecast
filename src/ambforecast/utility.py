@@ -10,7 +10,7 @@ import numpy as np
 
 from joblib import Parallel, delayed
 
-from swast_forecast.ensemble import ProphetARIMAEnsemble
+from .ensemble import ProphetARIMAEnsemble
 
 
 def pre_process_daily_data(df, observation_col, index_col):

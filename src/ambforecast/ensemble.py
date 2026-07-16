@@ -15,79 +15,6 @@ class NotFittedError(ValueError, AttributeError):
     Credit to SkLearn NotFittedError"""
 
 
-def new_years_day_holidays(County):  # start='2013-01-01', years=20):
-    """
-    A convenience function for creating a Prophet format
-    new years day holidays dataframe.
-
-    Bu default returns new years day dates between 2013 and
-    20 years into the future.
-
-    Parameters:
-    ---------
-    start: str, optional (default='2013-01-01')
-
-    years: int, optional (default=20)
-        How many years of new years day dates to return from the
-        start date
-
-    Returns:
-    --------
-        pd.DataFrame
-        In Prophet format columns = [holiday, ds]
-
-    """
-
-    # Original holidays dataframe.
-
-    # return pd.DataFrame({
-    #     'holiday': 'new_year',
-    #     'ds': pd.date_range(start=start,
-    #                         periods=years,
-    #                         freq='YS')
-    # })
-
-    # Getting holiday data (may need to rethink hwo this works with ARIMA), not just for New Year.
-    # This will mean ARIMA holiday regressor will treat each holiday the same.
-    # Combined with Prophet this evens it out slightly, but ideally, ARIMA will accept multiple regressors i.e. isNewYear
-    # This will make it convenient going forward with other regressors.
-
-    #     from swast_db_connector import warehouse_connection
-
-    #     con = warehouse_connection()
-
-    #     df_holiday = pd.read_sql(
-    #     '''
-    #     SELECT ds,
-    #     exceptionalname as holiday,
-    #     lower_window,
-    #     upper_window,
-    #     county
-
-    #     FROM [ROC_FCP].[dbo].[ExceptionalDates]
-
-    #     where included = 1
-
-    #     order by ds asc
-    #     ''',con=con)
-
-    from swast_db_connector import warehouse_engine
-    from sqlalchemy import text
-
-    engine = warehouse_engine()
-    df_holidays_query = text(""" SELECT ds,
-        exceptionalname as holiday,
-        lower_window,
-        upper_window,
-        county FROM [ROC_FCP].[dbo].[ExceptionalDates]
-        where included = 1 order by ds""")
-
-    with engine.connect() as con, con.begin():
-        df_holiday = pd.read_sql(df_holidays_query, con=con)
-
-    return df_holiday[df_holiday.county == County]
-
-
 class ProphetARIMAEnsemble:
     """
     An ensemble of Prophet and Regression with ARIMA errors for forecasting
@@ -136,11 +63,7 @@ class ProphetARIMAEnsemble:
         self.seasonal_order = seasonal_order
         self.County = County
 
-        # by default the ensemble has new years day as a holiday
-        if df_holiday is not None:
-            self.holidays = df_holiday[df_holiday.county == County]
-        else:
-            self.holidays = new_years_day_holidays(County)
+        self.holidays = df_holiday[df_holiday.county == County]
 
         # needed because Prophet constructor
         self.alpha = prophet_default_alpha
@@ -214,8 +137,8 @@ class ProphetARIMAEnsemble:
         self.arima_model = sm.tsa.arima.ARIMA(
             endog=y_train,
             exog=arima_holidays,
-            order=(1, 1, 3),
-            seasonal_order=(1, 0, 1, 7),
+            order=self.order,
+            seasonal_order=self.seasonal_order,
             enforce_stationarity=False,
         )
 

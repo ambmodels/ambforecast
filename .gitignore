@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Files shouldn't be here - but just in case!
+df_historic.csv
+df_holidays.csv
+locationdata.csv
+weather_api_config.py
+weather_api_config_v2.py
+swast_forecast.zip

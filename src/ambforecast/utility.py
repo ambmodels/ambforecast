@@ -1,40 +1,32 @@
-"""
-swast_forecast.utility
+"""Utilities to help with forecasting."""
 
-utilities to help with forecasting
-
-"""
-
-import pandas as pd
 import numpy as np
-
+import pandas as pd
 from joblib import Parallel, delayed
 
 from .ensemble import ProphetARIMAEnsemble
 
 
 def pre_process_daily_data(df, observation_col, index_col):
-    """
-    Assumes daily data is stored in long format.  Read in
-    and pivot to wide format so that there is a single
-    colmumn for each regions time series.
+    """Convert daily data to wide format.
 
-    Parameters:
-    --------
-    path: str
-        directory and file name of raw datafile
+    Assumes daily data is stored in long format. Read in and pivot to wide
+    format so that there is a single column for each regions time series.
 
+    Parameters
+    ----------
+    df: pd.DataFrame
+        Raw dataframe
     observation_col: str
         the name of the column containing the time series observations
-
     index_col: str
          - the index columns.  Assume this is a date.
 
-    Returns:
-    --------
+    Returns
+    -------
         pd.DataFrame
-    """
 
+    """
     df.set_index(index_col)
 
     df.columns = map(str.lower, df.columns)
@@ -54,15 +46,12 @@ def pre_process_daily_data(df, observation_col, index_col):
 
 
 def get_best_arima_parameters():
-    """
-    Returns a dict containing the best arima
-    parmaeters for the SWAST forecasting.
+    """Return a dict with the best arima parameters for the SWAST forecasting.
 
-    A new ambulance trust should run auto_arima
-    on their data to get their best parameters and
-    also CV a few models.
+    A new ambulance trust should run auto_arima on their data to get their
+    best parameters and also CV a few models.
 
-    Returns:
+    Returns
     -------
         dict
 
@@ -71,27 +60,24 @@ def get_best_arima_parameters():
     return params
 
 
-def default_ensemble(County, df_holiday=None):
-    """
-    Convenience function to create a ProphetARIMAEnsemble
-    using default best known parameters.
-    """
+def default_ensemble(county, df_holiday=None):
+    """Create a ProphetARIMAEnsemble using default best known parameters."""
     params = get_best_arima_parameters()
     return ProphetARIMAEnsemble(
         order=params["order"],
         seasonal_order=params["seasonal_order"],
-        County=County,
+        County=county,
         df_holiday=df_holiday,
     )
 
 
 def forecast(y_train, horizon, alpha=0.05, return_all_models=False):
-    """
-    Convenience function. All in one forecast function.
+    """All in one forecast function.
+
     Create a default ensemble fit the training data and predict ahead.
 
-    Parameters:
-    --------
+    Parameters
+    ----------
     y_train: pd.Series or pd.DataFrame
         y observations for training. Index is a DateTimeIndex
 
@@ -105,24 +91,28 @@ def forecast(y_train, horizon, alpha=0.05, return_all_models=False):
         Return individual Regression with ARIMA error and Prophet
         model predictions
 
-    Returns:
+    Returns
     -------
         pd.DataFrame
+
     """
     model = default_ensemble()
     model.fit(y_train)
-    return model.predict(horizon, alpha=alpha, return_all_models=return_all_models)
+    return model.predict(
+        horizon, alpha=alpha, return_all_models=return_all_models
+    )
 
 
-def multi_region_forecast(y_train, horizon, alpha=0.05, return_all_models=False):
-    """
-    Run forecasts for all regions included in the training data.
+def multi_region_forecast(
+    y_train, horizon, alpha=0.05, return_all_models=False
+):
+    """Run forecasts for all regions included in the training data.
 
     This function exploits multiple CPUs. E.g. If your machine has 4 Cores then
     It will run 4 regional forecasts in parrallel.
 
-    Parameters:
-    --------
+    Parameters
+    ----------
     y_train: pd.DataFrame
         Training data - each colunm in a region.
 
@@ -136,7 +126,7 @@ def multi_region_forecast(y_train, horizon, alpha=0.05, return_all_models=False)
         Return individual Regression with ARIMA error and Prophet
         model predictions
 
-    Returns:
+    Returns
     -------
         List
         Each item is a pd.DataFrame containing the forecast for a region.

@@ -1,24 +1,23 @@
-"""
-
-Ensemble forcasting classes for SWAST forecasting of
-dispatching one or more ambulances
-
-"""
+"""Ensemble forcasting classes for SWAST forecasting of dispatching one or more ambulances."""
 
 import pandas as pd
-from prophet import Prophet
 import statsmodels.api as sm
+from prophet import Prophet
 
 
 class NotFittedError(ValueError, AttributeError):
     """Exception class to raise if estimator is used before fitting.
-    Credit to SkLearn NotFittedError"""
+
+    Credit to SkLearn NotFittedError.
+
+    """
 
 
 class ProphetARIMAEnsemble:
-    """
-    An ensemble of Prophet and Regression with ARIMA errors for forecasting
-    the no. of calls that require the dispatch of > 1 ambulance.
+    """Ensemble of Prophet and Regression with ARIMA errors.
+
+    For forecasting the no. of calls that require the dispatch of > 1
+    ambulance.
 
     Works by taking the average of the two forecasting methods.
 
@@ -31,16 +30,15 @@ class ProphetARIMAEnsemble:
         self,
         order,
         seasonal_order,
-        County,
+        county,
         prophet_default_alpha=0.05,
         df_holiday=None,
         **arima_kwargs,
     ):
-        """
-        Initialise the ensemble
+        """Initialise the ensemble.
 
-        Parameters:
-        ---------
+        Parameters
+        ----------
         order: tuple
             ARIMA(p, d, q) p = AR; d = integrated; q = MA. e.g. (3, 1, 0)
 
@@ -61,9 +59,7 @@ class ProphetARIMAEnsemble:
         """
         self.order = order
         self.seasonal_order = seasonal_order
-        self.County = County
-
-        self.holidays = df_holiday[df_holiday.county == County]
+        self.holidays = df_holiday[df_holiday.county == county]
 
         # needed because Prophet constructor
         self.alpha = prophet_default_alpha
@@ -93,10 +89,9 @@ class ProphetARIMAEnsemble:
         )
 
     def fit(self, y_train):
-        """
-        Fit the model to the training data
+        """Fit the model to the training data.
 
-        Parameters:
+        Parameters
         ----------
         y_train: pd.DataFrame
             pandas dataframe containing the y training data.
@@ -104,7 +99,6 @@ class ProphetARIMAEnsemble:
             is a single column of training data
 
         """
-
         # fit the arima model
         self._fit_arima(y_train)
 
@@ -115,15 +109,14 @@ class ProphetARIMAEnsemble:
         self._fitted = True
 
     def _fit_arima(self, y_train):
-        """
-        Fits an ARIMA model to the training data
+        """Fit an ARIMA model to the training data.
 
-        Parameters:
+        Parameters
         ----------
         y_train: pd.DataFrame
             time series data.  DataFrame uses a DateTimeIndex
-        """
 
+        """
         # store training index and data
         self._training_index = y_train.index
         self._y_train = y_train
@@ -147,46 +140,47 @@ class ProphetARIMAEnsemble:
         self._arima_fitted = self.arima_model.fit()
 
     def _fit_prophet(self, y_train, alpha):
-        """
-        Fits an Prophet model to the training data
+        """Fit a Prophet model to the training data.
 
-        Parameters:
+        Parameters
         ----------
         y_train: pd.DataFrame
             time series data.  DataFrame uses a DateTimeIndex
 
         alpha: float
             used to form a 100(1 - alpha) prediction interval
+
         """
         # minimal options set.
         self.prophet_model = Prophet(
-            holidays=self.holidays, interval_width=1 - alpha, daily_seasonality=False
+            holidays=self.holidays,
+            interval_width=1 - alpha,
+            daily_seasonality=False,
         )  # , changepoint_range=1)
 
         self.prophet_model.fit(self._prophet_training_data(y_train))
 
     def _encode_holidays(self, holidays, idx):
-        """
-        Encodes holidays as a SINGLE dummy variable
-        for the ARIMA model.
+        """Encode holidays as a SINGLE dummy variable for the ARIMA model.
 
         I.e. 0 if no holiday 1 if holiday important.
         This would need adapting if ARIMA wants to model
         the effect of individual holidays/special days
         differently.
 
-        Parameters:
-        ---------
+        Parameters
+        ----------
         holidays: array-like
             list of holidays
 
         idx: DataTimeIndex
             date times to check
 
-        Returns:
-        --------
+        Returns
+        -------
             pd.DataFrame
             0/1 encoding with a DateTimeIndex.
+
         """
         dummy = idx.isin(holidays).astype(int)
         dummy = pd.DataFrame(dummy)
@@ -195,17 +189,18 @@ class ProphetARIMAEnsemble:
         return dummy
 
     def _prophet_training_data(self, y_train):
-        """
-        Converts a standard pandas datetimeindexed dataframe
-        for time series into one suitable for Prophet
+        """Create dataframe in suitable format for Prophet.
 
-        Parameters:
-        ---------
+        Converts a standard pandas datetimeindexed dataframe for time series
+        into one suitable for Prophet
+
+        Parameters
+        ----------
         y_train: pd.DataFrame
             univariate time series data
 
-        Returns:
-        --------
+        Returns
+        -------
             pd.DataFrame in Prophet format
             columns = ['ds', 'y']
 
@@ -217,11 +212,13 @@ class ProphetARIMAEnsemble:
         return prophet_train
 
     def predict(
-        self, horizon, alpha=0.05, return_pred_int=False, return_all_models=False
+        self,
+        horizon,
+        alpha=0.05,
+        return_pred_int=False,
+        return_all_models=False,
     ):
-        """
-        Produce a point forecast and prediction intervals for a period ahead.
-
+        """Produce point forecast and prediction intervals for a period ahead.
 
         Paramerters:
         --------
@@ -235,8 +232,8 @@ class ProphetARIMAEnsemble:
             If true returns ensemble results AND ARIMA and Prophet
             point forecasts and prediction intervals
 
-        Returns:
-        ---------
+        Returns
+        -------
             pd.DataFrame
 
             Forecasted time series in a data frame with a pd.DataTimeIndex.
@@ -248,7 +245,6 @@ class ProphetARIMAEnsemble:
             with columns for ARIMA and Prophet models.
 
         """
-
         self.check_is_fitted()
 
         # reg with ARIMA errors prediction
@@ -261,9 +257,9 @@ class ProphetARIMAEnsemble:
         post_fix = str(int((1 - alpha) * 100))
 
         summary_frame = pd.concat([arima_forecast, prophet_forecast], axis=1)
-        summary_frame["yhat"] = summary_frame[["prophet_mean", "arima_mean"]].mean(
-            axis=1
-        )
+        summary_frame["yhat"] = summary_frame[
+            ["prophet_mean", "arima_mean"]
+        ].mean(axis=1)
         summary_frame["yhat_lower_" + post_fix] = summary_frame[
             ["prophet_lower_" + post_fix, "arima_lower_" + post_fix]
         ].mean(axis=1)
@@ -283,25 +279,23 @@ class ProphetARIMAEnsemble:
             return summary_frame[sorted_columns[:1]]
 
     def _arima_predict(self, horizon, alpha=0.05):
-        """
-        ARIMA forecast
+        """ARIMA forecast.
 
-        Parameters:
-        ---------
+        Parameters
+        ----------
         horizon: int
             periods to ahead to forecast
 
         alpha: float, optional (default=0.05)
             width of prediction intervals
 
-        Returns:
-        ---------
+        Returns
+        -------
         pd.DataFrame
 
         Columns = Mean, Lower_PI, Upper_PI
 
         """
-
         # equivalent to prophet make future dataframe
         pred_idx = pd.date_range(
             start=self._training_index[-1],
@@ -310,7 +304,9 @@ class ProphetARIMAEnsemble:
         )[1:]
 
         # encode holidays for prediction
-        exog_holiday = self._encode_holidays(self.holidays["ds"].to_numpy(), pred_idx)
+        exog_holiday = self._encode_holidays(
+            self.holidays["ds"].to_numpy(), pred_idx
+        )
 
         forecast = self._arima_fitted.get_forecast(horizon, exog=exog_holiday)
 
@@ -326,20 +322,18 @@ class ProphetARIMAEnsemble:
         return df
 
     def _prophet_predict(self, horizon, alpha):
-        """
+        """Prophet forecast.
 
-        Prophet forecast
-
-        Parameters:
-        ---------
+        Parameters
+        ----------
         horizon: int
             periods to ahead to forecast
 
         alpha: float
             width of prediction intervals
 
-        Returns:
-        ---------
+        Returns
+        -------
         pd.DataFrame
 
         Columns = Mean, Lower_PI, Upper_PI
@@ -378,6 +372,7 @@ class ProphetARIMAEnsemble:
         return df.drop(["ds"], axis=1)
 
     def check_is_fitted(self):
+        """Raise error if ensemble model doesn't fit."""
         if not self._fitted:
             msg = (
                 "Ensemble model has not been fitted. "

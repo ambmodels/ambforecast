@@ -27,6 +27,7 @@ def predict_prophet(historic, holidays, forecast_length, metric):
     -------
     pd.DataFrame
         Forecast dataframe returned by Prophet.predict().
+
     """
     if metric == "Responses":
         changepoint_range = 1

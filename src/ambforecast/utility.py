@@ -66,7 +66,7 @@ def default_ensemble(county, df_holiday=None):
     return ProphetARIMAEnsemble(
         order=params["order"],
         seasonal_order=params["seasonal_order"],
-        County=county,
+        county=county,
         df_holiday=df_holiday,
     )
 

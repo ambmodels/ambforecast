@@ -3,7 +3,7 @@ repos:
     hooks:
       - id: forbid-private-path
         name: Block private data path
-        entry: bash -c 'git diff --cached -- . ":(exclude).pre-commit-config.yaml" | grep -q "Time_Data_DES.csv" && exit 1 || exit 0'
+        entry: bash -c 'git diff --cached -- . ":(exclude).pre-commit-config.yaml" ":(exclude).gitignore" | grep -qE "Time_Data_DES\.csv|df_historic\.csv" && exit 1 || exit 0'
         language: system
         pass_filenames: false
         stages: [pre-commit]

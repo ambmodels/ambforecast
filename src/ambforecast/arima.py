@@ -5,6 +5,30 @@ import pandas as pd
 import statsmodels.api as sm
 
 
+def encode_holidays(dates, holiday_dates):
+    """Create dataframe with encoded holidays for ARIMA.
+
+    For each date, it is either marked as a holiday (1) or not (0).
+
+    Parameters
+    ----------
+    dates : pd.Series | pd.Index
+        Dates in the data that is being fit or predicted.
+    holiday_dates : pd.Series | pd.Index
+        Dates that holidays are on.
+
+    Returns
+    -------
+    pd.DataFrame
+        The index is each date from dates and then the column "holiday" marks
+        whether each date was in holiday_dates or not.
+    """
+    return pd.DataFrame(
+        {"holiday": dates.isin(holiday_dates)},
+        index=dates
+    ).astype(int)
+
+
 def predict_arima(historic, holidays, forecast_length):
     """Predict future demand using ARIMA.
 
@@ -33,10 +57,10 @@ def predict_arima(historic, holidays, forecast_length):
     # "holiday" which is 1 when the date is listed as a holiday or 0
     # otherwise. This just uses the date - it doesn't use lower_window and
     # upper_window
-    holiday_dummy = pd.DataFrame(
-        {"holiday": arima_historic.index.isin(holidays["ds"])},
-        index=arima_historic.index
-    ).astype(int)
+    holiday_dummy = encode_holidays(
+        dates=arima_historic.index,
+        holiday_dates=holidays["ds"]
+    )
 
     # Fit ARIMA model
     model = sm.tsa.arima.ARIMA(
@@ -56,10 +80,10 @@ def predict_arima(historic, holidays, forecast_length):
     )
 
     # Encode holidays for prediction dates
-    holiday_dummy = pd.DataFrame(
-        {"holiday": prediction_dates.isin(holidays["ds"])},
-        index=prediction_dates
-    ).astype(int)
+    holiday_dummy = encode_holidays(
+        dates=prediction_dates,
+        holiday_dates=holidays["ds"]
+    )
 
     # Get forecast for those dates and extract summary dataframe
     model_forecast = model.get_forecast(forecast_length, exog=holiday_dummy)

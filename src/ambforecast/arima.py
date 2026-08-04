@@ -30,12 +30,13 @@ def predict_arima(historic, holidays, forecast_length):
     arima_historic = historic.set_index("ds")
 
     # Create dataframe where index is each date from historic and column is
-    # "holiday" which is True when the date is listed as a holiday. This just
-    # uses the date - it doesn't use lower_window and upper_window
+    # "holiday" which is 1 when the date is listed as a holiday or 0
+    # otherwise. This just uses the date - it doesn't use lower_window and
+    # upper_window
     holiday_dummy = pd.DataFrame(
         {"holiday": arima_historic.index.isin(holidays["ds"])},
         index=arima_historic.index
-    )
+    ).astype(int)
 
     # Fit ARIMA model
     model = sm.tsa.arima.ARIMA(
@@ -58,7 +59,7 @@ def predict_arima(historic, holidays, forecast_length):
     holiday_dummy = pd.DataFrame(
         {"holiday": prediction_dates.isin(holidays["ds"])},
         index=prediction_dates
-    )
+    ).astype(int)
 
     # Get forecast for those dates and extract summary dataframe
     model_forecast = model.get_forecast(forecast_length, exog=holiday_dummy)
@@ -68,7 +69,7 @@ def predict_arima(historic, holidays, forecast_length):
     forecast = forecast.rename_axis("ds").drop("mean_se", axis=1)
     forecast = forecast.rename(columns={
         "mean": "arima_mean",
-        "mean_ci_lower": "arima_lower_95",
-        "mean_ci_upper": "arima_upper_95"
+        "mean_ci_lower": "arima_lower",
+        "mean_ci_upper": "arima_upper"
     })
     return forecast

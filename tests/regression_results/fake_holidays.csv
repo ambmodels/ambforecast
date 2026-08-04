@@ -1,6 +1,0 @@
-ds,holiday,lower_window,upper_window,county
-2010-01-01,New Year,0,0,FakeCounty
-2010-12-25,Christmas,-2,2,FakeCounty
-2011-01-01,New Year,0,0,FakeCounty
-2011-12-25,Christmas,-2,2,FakeCounty
-2012-01-01,New Year,0,0,FakeCounty

@@ -39,6 +39,7 @@ def run_forecast(df_historic, df_holidays, method):
 
     # Loop through each combination of county and metric
     forecast_list = []
+    seed_counter = 0
     for county, metric in tqdm(
         unique_pairs.itertuples(index=False), total=len(unique_pairs)
     ):
@@ -57,7 +58,8 @@ def run_forecast(df_historic, df_holidays, method):
 
         # Generate forecasts
         if method == "prophet":
-            np.random.seed(42)
+            seed_counter += 1
+            np.random.seed(seed_counter)
             forecast = predict_prophet(
                 historic=historic,
                 holidays=holidays,

@@ -25,8 +25,8 @@ def predict_prophet(historic, holidays, forecast_length, metric):
 
     Returns
     -------
-    pd.DataFrame
-        Forecast dataframe returned by Prophet.predict().
+    forecast : pd.DataFrame
+        Forecast dataframe.
 
     """
     if metric == "Responses":
@@ -52,4 +52,30 @@ def predict_prophet(historic, holidays, forecast_length, metric):
     future = prophet.make_future_dataframe(
         freq="D", periods=forecast_length, include_history=False
     )
-    return prophet.predict(future)
+
+    forecast = prophet.predict(future)
+
+    # Choose which columns to keep
+    forecast = forecast[
+        [
+            "ds",
+            "yhat",
+            "yhat_lower",
+            "yhat_upper",
+            "trend",
+            "holidays",
+            "weekly",
+            "yearly",
+        ]
+    ]
+    # The lower and upper boundaries from prophet are prediction intervals
+    # See: https://facebook.github.io/prophet/docs/diagnostics.html
+    forecast = forecast.rename(
+        columns={
+            "yhat": "prophet_mean",
+            "yhat_lower": "prophet_pi_lower",
+            "yhat_upper": "prophet_pi_upper",
+        }
+    )
+
+    return forecast

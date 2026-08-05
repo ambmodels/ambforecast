@@ -17,7 +17,7 @@ def plot_forecast(
     historic_length,
     forecast_colour,
 ):
-    """Plot actual and forecast values with 95% confidence intervals.
+    """Plot actual and forecast values with 95% prediction intervals.
 
     Parameters
     ----------
@@ -39,8 +39,8 @@ def plot_forecast(
 
     """
     mean_col = f"{method}_mean"
-    lower_col = f"{method}_lower"
-    upper_col = f"{method}_upper"
+    lower_col = f"{method}_pi_lower"
+    upper_col = f"{method}_pi_upper"
 
     # Get the final X days specified of the historic data
     date_min = df_historic["ds"].max() - dt.timedelta(days=historic_length - 1)
@@ -58,7 +58,7 @@ def plot_forecast(
 
     df = pd.concat([historic_plot, forecast_plot]).reset_index(drop=True)
 
-    fig, ax = plt.subplots(figsize=(11, 5))
+    fig, ax = plt.subplots(figsize=(12, 5))
 
     ax.plot(df["ds"], df["y"], color="black", label="Actual")
     ax.plot(df["ds"], df[mean_col], color=forecast_colour, label="Forecast")
@@ -68,7 +68,7 @@ def plot_forecast(
         df[upper_col],
         color=forecast_colour,
         alpha=0.2,
-        label="Confidence interval",
+        label="95% Prediction Interval",
     )
 
     # Vertical line marking start of the forecast

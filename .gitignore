@@ -226,3 +226,11 @@ weather_api_config_v2.py
 swast_forecast.zip
 Time_Data_DES.csv
 Trust OAG Forecast.ipynb
+# Great Docs build directory (ephemeral, do not commit)
+great-docs/
+
+# Great Docs versioned-build artifacts
+_great_docs_build/
+.great-docs-build/
+.great-docs-cache/
+.great-docs/

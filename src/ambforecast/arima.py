@@ -6,7 +6,7 @@ import pandas as pd
 import statsmodels.api as sm
 
 
-def encode_holidays(dates, holiday_dates):
+def _encode_holidays(dates, holiday_dates):
     """Create dataframe with encoded holidays for ARIMA.
 
     For each date, it is either marked as a holiday (1) or not (0).
@@ -60,7 +60,7 @@ def predict_arima(historic, holidays, forecast_length):
     # "holiday" which is 1 when the date is listed as a holiday or 0
     # otherwise. This just uses the date - it doesn't use lower_window and
     # upper_window
-    holiday_dummy = encode_holidays(
+    holiday_dummy = _encode_holidays(
         dates=arima_historic.index, holiday_dates=holidays["ds"]
     )
 
@@ -82,7 +82,7 @@ def predict_arima(historic, holidays, forecast_length):
     )
 
     # Encode holidays for prediction dates
-    holiday_dummy = encode_holidays(
+    holiday_dummy = _encode_holidays(
         dates=prediction_dates, holiday_dates=holidays["ds"]
     )
 

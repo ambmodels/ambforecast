@@ -80,6 +80,19 @@ content_style: sky
 # - Move items between sections or create new sections
 # - Use 'members: false' to exclude methods from documentation
 # - Add 'desc:' to sections for descriptions
+reference:
+  - title: Forecasting methods
+    contents:
+      - prophet.predict_prophet
+      - arima.predict_arima
+
+  - title: Run forecast
+    contents:
+      - forecast.run_forecast
+
+  - title: Analysing results
+    contents:
+      - plot.plot_forecast
 
 # Site URL
 # --------

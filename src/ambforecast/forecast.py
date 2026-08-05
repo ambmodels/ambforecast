@@ -8,7 +8,7 @@ from .arima import predict_arima
 from .prophet import predict_prophet
 
 
-def run_forecast(df_historic, df_holidays, method):
+def run_forecast(df_historic, df_holidays, metrics, method, forecast_length):
     """Run forecast.
 
     Parameters
@@ -21,8 +21,12 @@ def run_forecast(df_historic, df_holidays, method):
     df_holidays : pd.DataFrame
         Holidays. Should have columns "ds" (date), "holiday" (name of
         holiday), "lower_window", "upper_window" and "county".
+    metrics : list[str]
+        Metric names (values of "currency") to forecast.
     method : str
         Name of forecasting method to run. Either "prophet" or "arima".
+    forecast_length : int
+        Number of days to generate a forecast for.
 
     Returns
     -------
@@ -30,6 +34,9 @@ def run_forecast(df_historic, df_holidays, method):
         Forecast results.
 
     """
+    # Filter to requested metrics and drop any incomplete rows
+    df_historic = df_historic[df_historic["currency"].isin(metrics)].dropna()
+
     # Filter to unique pairs of counties and metrics
     unique_pairs = (
         df_historic[["ora", "currency"]]
@@ -63,12 +70,14 @@ def run_forecast(df_historic, df_holidays, method):
             forecast = predict_prophet(
                 historic=historic,
                 holidays=holidays,
-                forecast_length=42,
+                forecast_length=forecast_length,
                 metric=metric,
             )
         if method == "arima":
             forecast = predict_arima(
-                historic=historic, holidays=holidays, forecast_length=42
+                historic=historic,
+                holidays=holidays,
+                forecast_length=forecast_length,
             )
 
         # Add columns with county and metric name, then save result to list

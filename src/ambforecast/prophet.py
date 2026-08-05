@@ -62,19 +62,18 @@ def predict_prophet(historic, holidays, forecast_length, metric):
             "yhat",
             "yhat_lower",
             "yhat_upper",
-            "trend",
-            "holidays",
-            "weekly",
-            "yearly",
         ]
     ]
+
+    forecast.insert(1, "method", "prophet")
+
     # The lower and upper boundaries from prophet are prediction intervals
     # See: https://facebook.github.io/prophet/docs/diagnostics.html
     forecast = forecast.rename(
         columns={
-            "yhat": "prophet_mean",
-            "yhat_lower": "prophet_pi_lower",
-            "yhat_upper": "prophet_pi_upper",
+            "yhat": "forecast",
+            "yhat_lower": "pi_lower",
+            "yhat_upper": "pi_upper",
         }
     )
 

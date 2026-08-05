@@ -94,12 +94,19 @@ def predict_arima(historic, holidays, forecast_length):
     # statsmodels ARIMA labels these as confidence intervals, but they are
     # actually better described as approximate prediction intervals
     # See: https://github.com/statsmodels/statsmodels/issues/8230
-    forecast = forecast.rename_axis("ds").drop("mean_se", axis=1)
-    forecast = forecast.rename(
-        columns={
-            "mean": "arima_mean",
-            "mean_ci_lower": "arima_pi_lower",
-            "mean_ci_upper": "arima_pi_upper",
-        }
+    forecast = (
+        forecast
+        .rename_axis("ds")
+        .reset_index()
+        .drop("mean_se", axis=1)
+        .rename(
+            columns={
+                "mean": "forecast",
+                "mean_ci_lower": "pi_lower",
+                "mean_ci_upper": "pi_upper",
+            }
+        )
     )
+    forecast.insert(0, "method", "arima")
+
     return forecast

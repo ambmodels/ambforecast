@@ -81,8 +81,8 @@ def run_forecast(df_historic, df_holidays, metrics, method, forecast_length):
             )
 
         # Add columns with county and metric name, then save result to list
-        forecast.insert(0, "county", county)
-        forecast.insert(1, "currency", metric)
+        forecast.insert(1, "county", county)
+        forecast.insert(2, "currency", metric)
         forecast_list.append(forecast)
 
     return pd.concat(forecast_list)

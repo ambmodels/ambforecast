@@ -111,6 +111,4 @@ def predict_arima(historic, holidays, forecast_length, max_iter=50):
             }
         )
     )
-    forecast.insert(0, "method", f"arima_maxiter{max_iter}")
-
     return forecast

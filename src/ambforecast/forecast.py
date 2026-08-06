@@ -72,8 +72,8 @@ class Forecaster:
             .reset_index(drop=True)
         )
 
-        # Empty list to store forecast results
-        self.results_list = []
+        # Empty dict to store forecast results
+        self.results_dict = {}
 
         # Print the forecast start date
         forecast_start_date = df_historic["ds"].max() + pd.Timedelta(days=1)
@@ -82,7 +82,7 @@ class Forecaster:
             + f"{forecast_start_date.strftime('%A %d %B %Y')}"
         )
 
-    def generate_forecast(self, county, metric, method, seed=None):
+    def generate_forecast(self, county, metric, method, name, params=None, seed=None):
         """Generate single forecast.
 
         Parameters
@@ -93,8 +93,12 @@ class Forecaster:
             Name of metric to generate forecast for.
         method : str
             Either "arima" or "prophet".
+        name : str
+            Name for the forecast.
+        params : dict
+            Extra keyword arguments for the forecasting method.
         seed : int
-            Random seed
+            Random seed.
 
         Returns
         -------
@@ -125,54 +129,119 @@ class Forecaster:
                 holidays=holidays,
                 forecast_length=self.forecast_length,
                 metric=metric,
+                **params
             )
-        if method == "arima":
+        elif method == "arima":
             forecast = predict_arima(
                 historic=historic,
                 holidays=holidays,
                 forecast_length=self.forecast_length,
+                **params
             )
+        else:
+            raise ValueError(f"Unknown method: {method}")
 
-        # Add columns with county and metric name, then save result to list
+        # Add columns with name, county and metric, then save result to list
+        forecast.insert(0, "method", name)
         forecast.insert(1, "county", county)
         forecast.insert(2, "currency", metric)
         return forecast
 
-    def run(self, method):
-        """Generate forecasts for all metrics using specified method.
+    def run(self, scenarios=None, *, name=None, method=None, params=None):
+        """Generate forecasts for all metrics and counties.
+
+        Can run as single scenario:
+        >> forecaster.run(name="arima_current_version",
+                            method="arima",
+                            params={"order": (1, 1, 1), ...})
+
+        Or can run a list of multiple scenarios:
+        >> forecaster.run(scenarios=[{...}, {...}])
 
         Parameters
         ----------
+        scenarios : list[dict]
+            List of dictionaries, where each dictionary has the keys "name",
+            "method" and "params".
+        name : str
+            Name for the scenario.
         method : str
-            Either "prophet" or "arima".
+            Method to use - either "arima" or "prophet".
+        parms : dict
+            Parameters for that method.
 
         """
+        # If scenarios is provided, shouldn't also provide name/method/params
+        if scenarios is not None:
+            if name or method or params:
+                raise ValueError("Pass either 'scenarios' OR 'name/method/params', not both.")
+            scenario_list = scenarios
+        # If scenarios is not provided, make sure have name + method
+        else:
+            if name is None or method is None:
+                raise ValueError("When 'scenarios' is not provided, 'name' and 'method' are required.")
+            scenario_list = [
+                {
+                    "name": name,
+                    "method": method,
+                    "params": params,
+                }
+            ]
+        # TODO: Check if names are in existing names in results_list
+        # TODO: Check for duplicate names in scenarios if provided scenarios
+
+        # TODO: Run scenarios in parallel too?
+
         pairs = list(self.unique_pairs.itertuples(index=False, name=None))
         seeds = [i for i in range(len(pairs))]
 
-        # Run sequentially
-        if self.cores == 1:
-            forecast_list = [
-                self.generate_forecast(
-                    county=county, metric=metric, method=method, seed=seed
+        # Loop over scenarios
+        for scenario in scenario_list:
+            print(f"Running scenario: {scenario}")
+
+            # Run sequentially
+            if self.cores == 1:
+                forecast_list = [
+                    self.generate_forecast(
+                        county=county,
+                        metric=metric,
+                        method=scenario["method"],
+                        name=scenario["name"],
+                        params=scenario.get("params", {}),
+                        seed=seed
+                    )
+                    for (county, metric), seed in zip(pairs, seeds, strict=True)
+                ]
+            # Run in parallel
+            else:
+                # Check number of cores is valid
+                valid_cores = [-1] + list(range(1, cpu_count()))
+                if self.cores not in valid_cores:
+                    raise ValueError(
+                        f"Invalid cores: {self.cores}. Must be one of: "
+                        + f"{valid_cores}."
+                    )
+                forecast_list = Parallel(n_jobs=self.cores)(
+                    delayed(self.generate_forecast)(
+                        county=county,
+                        metric=metric,
+                        method=scenario["method"],
+                        name=scenario["name"],
+                        params=scenario.get("params", {}),
+                        seed=seed
+                    )
+                    for (county, metric), seed in zip(pairs, seeds, strict=True)
                 )
-                for (county, metric), seed in zip(pairs, seeds, strict=True)
-            ]
-        # Run in parallel
-        else:
-            # Check number of cores is valid
-            valid_cores = [-1] + list(range(1, cpu_count()))
-            if self.cores not in valid_cores:
-                raise ValueError(
-                    f"Invalid cores: {self.cores}. Must be one of: "
-                    + f"{valid_cores}."
-                )
-            forecast_list = Parallel(n_jobs=self.cores)(
-                delayed(self.generate_forecast)(county, metric, method, seed)
-                for (county, metric), seed in zip(pairs, seeds, strict=True)
-            )
-        self.results_list.append(pd.concat(forecast_list))
+            # Store results for this scenario by name
+            self.results_dict[scenario["name"]] = pd.concat(forecast_list)
 
     @property
     def results(self):
-        return pd.concat(self.results_list)
+        """Return results_list as a single dataframe.
+
+        Returns
+        -------
+        pd.DataFrame
+            Single dataframe with all forecast results.
+        """
+        return pd.concat(list(self.results_dict.values()), ignore_index=True)

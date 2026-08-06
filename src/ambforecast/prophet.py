@@ -73,8 +73,6 @@ def predict_prophet(historic, holidays, forecast_length, metric):
         ]
     ]
 
-    forecast.insert(1, "method", "prophet")
-
     # The lower and upper boundaries from prophet are prediction intervals
     # See: https://facebook.github.io/prophet/docs/diagnostics.html
     forecast = forecast.rename(

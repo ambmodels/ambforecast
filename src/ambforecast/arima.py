@@ -30,7 +30,7 @@ def _encode_holidays(dates, holiday_dates):
     ).astype(int)
 
 
-def predict_arima(historic, holidays, forecast_length):
+def predict_arima(historic, holidays, forecast_length, max_iter=50):
     """Predict future demand using ARIMA.
 
     Parameters
@@ -45,6 +45,11 @@ def predict_arima(historic, holidays, forecast_length):
         county.
     forecast_length : int
         Number of days to forecast.
+    max_iter: int
+        The maximum number of iterations. Originally, we were using the
+        statsmodels default (50), but had a warning "Maximum Likelihood
+        optimisation failed to converge". This warning can be resolved by
+        increasing the maximum.
 
     Returns
     -------
@@ -73,7 +78,7 @@ def predict_arima(historic, holidays, forecast_length):
         enforce_stationarity=False,
         freq="D",
     )
-    model = model.fit()
+    model = model.fit(method_kwargs={"maxiter": max_iter})
 
     # Create index of dates to make prediction for
     prediction_dates = pd.date_range(
@@ -95,8 +100,7 @@ def predict_arima(historic, holidays, forecast_length):
     # actually better described as approximate prediction intervals
     # See: https://github.com/statsmodels/statsmodels/issues/8230
     forecast = (
-        forecast
-        .rename_axis("ds")
+        forecast.rename_axis("ds")
         .reset_index()
         .drop("mean_se", axis=1)
         .rename(
@@ -107,6 +111,6 @@ def predict_arima(historic, holidays, forecast_length):
             }
         )
     )
-    forecast.insert(0, "method", "arima")
+    forecast.insert(0, "method", f"arima_maxiter{max_iter}")
 
     return forecast

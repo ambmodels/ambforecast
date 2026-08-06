@@ -1,5 +1,7 @@
 """Prophet forecast."""
 
+import cmdstanpy
+import logging
 from prophet import Prophet
 
 
@@ -29,6 +31,12 @@ def predict_prophet(historic, holidays, forecast_length, metric):
         Forecast dataframe.
 
     """
+    # Disable "start/done processing" from prophet
+    # Have to do within predict_prophet() rather than in notebook so that
+    # workers to keep these settings when running in parallel
+    cmdstanpy.disable_logging()
+    logging.getLogger("cmdstanpy").setLevel(logging.ERROR)
+
     if metric == "Responses":
         changepoint_range = 1
         changepoint_prior = 0.5

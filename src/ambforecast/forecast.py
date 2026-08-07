@@ -43,9 +43,7 @@ class Forecaster:
         ----------
         df_historic : pd.DataFrame
             Historic data. Should have columns "ds" (date), "currency"
-            (metric), "ora" (county/trust) and "y" (value). It should not
-            include dates that will be forecast, it should only contain
-            metrics you want to forecast, and it shouldn't contain any NA.
+            (metric), "ora" (county/trust) and "y" (value).
         df_holidays : pd.DataFrame
             Holidays. Should have columns "ds" (date), "holiday" (name of
             holiday), "lower_window", "upper_window" and "county".
@@ -250,7 +248,7 @@ class Forecaster:
             # use generate_forecast, which runs all paris in a loop
             if scenario["method"] == "ensemble":
                 full_forecast = calculate_ensemble(
-                    forecast_results = self.results,
+                    forecast_results=self.results,
                     **scenario.get("params", {}),
                 )
                 full_forecast.insert(0, "name", scenario["name"])

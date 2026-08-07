@@ -1,5 +1,6 @@
 """Run forecast."""
 
+import datetime as dt
 from collections import Counter
 
 import numpy as np
@@ -34,9 +35,7 @@ class Forecaster:
 
     """
 
-    def __init__(
-        self, df_historic, df_holidays, metrics, horizon, cores=1
-    ):
+    def __init__(self, df_historic, df_holidays, metrics, horizon, cores=1):
         """Initialise with data and settings to use across all forecasts.
 
         Parameters
@@ -83,35 +82,6 @@ class Forecaster:
             + f"{forecast_start_date.strftime('%A %d %B %Y')}"
         )
 
-    @staticmethod
-    def resolve_params(params, metric):
-        """Resolve params for a specific metric.
-
-        Any parameter value can be given as a plain value (used for all
-        metrics) or as a dict keyed by metric name.
-
-        Parameters
-        ----------
-        params : dict
-            Parameters, where each value is either a plain value or a
-            dict mapping metric name to value.
-        metric : str
-            Metric to resolve params for.
-
-        Returns
-        -------
-        dict
-            Params with any per-metric dicts resolved to a single value.
-
-        """
-        resolved = {}
-        for key, value in params.items():
-            if isinstance(value, dict) and metric in value:
-                resolved[key] = value[metric]
-            else:
-                resolved[key] = value
-        return resolved
-
     def generate_forecast(
         self, county, metric, method, name, params=None, seed=None
     ):
@@ -141,7 +111,7 @@ class Forecaster:
         # Set-up params object - including fetching relevant params for that
         # metric, if provided as dict with different params for each metric
         params = params or {}
-        params = self.resolve_params(params, metric)
+        params = resolve_params(params, metric)
 
         # Filter historic data to specified county and metric, then just keep
         # "ds" and "y" col
@@ -307,3 +277,117 @@ class Forecaster:
 
         """
         return pd.concat(list(self.results_dict.values()), ignore_index=True)
+
+
+def resolve_params(params, metric):
+    """Resolve params for a specific metric.
+
+    Any parameter value can be given as a plain value (used for all
+    metrics) or as a dict keyed by metric name.
+
+    Parameters
+    ----------
+    params : dict
+        Parameters, where each value is either a plain value or a
+        dict mapping metric name to value.
+    metric : str
+        Metric to resolve params for.
+
+    Returns
+    -------
+    dict
+        Params with any per-metric dicts resolved to a single value.
+
+    """
+    resolved = {}
+    for key, value in params.items():
+        if isinstance(value, dict) and metric in value:
+            resolved[key] = value[metric]
+        else:
+            resolved[key] = value
+    return resolved
+
+
+def split_train_test(df_historic, horizon):
+    """Split df_historic (full or subset) into training and test data.
+
+    Parameters
+    ----------
+    df_historic : pd.DataFrame
+        Historic data.
+    horizon : int
+        Number of days into future that the data is predicted.
+
+    Returns
+    -------
+    train_df, test_df : tuple[pd.DataFrame, pd.DataFrame]
+        Two subsets of the provided historic data - one for training and one
+        for testing.
+
+    """
+    # Find start date of testing
+    test_start = df_historic["ds"].max() - dt.timedelta(days=horizon - 1)
+    # Split into train and test dataset
+    train_df = df_historic[df_historic["ds"] < test_start]
+    test_df = df_historic[df_historic["ds"] >= test_start]
+    return train_df, test_df
+
+
+def create_rolling_samples(
+    df_historic, min_train=365 * 2, horizon=42, step=42
+):
+    """Create samples for cross-validation with rolling forecast origin.
+
+    Cross-validation with rolling forecast origin creates overlapping sets of
+    training and test data. Each sample trains on data available up to a
+    forecast origin and validates forecasts for the following `horizon` days.
+
+    Samples are generated from the most recent data backwards. `step` specifies
+    how many days earlier the forecast origin moves between samples. For
+    example, `step=7` creates samples with forecast origins 7 days apart.
+
+    Parameters
+    ----------
+    df_historic : pd.DataFrame
+        Historic data.
+    min_train : int
+        Minimum number of days to include in training sample. By default, set
+        to 2 years as that allows detection of yearly seasonality (e.g.,
+        Prophet minimum is 2 years).
+    horizon : int
+        Number of days into future that the data is predicted.
+    step : int
+        How many days to move by before creating a new sample. Warning:
+        using a step of 365 will produce test samples all at approximately the
+        same time of year.
+
+    Returns
+    -------
+    train, val : tuple[list[pd.DataFrame],list[pd.DataFrame]]
+        Two lists containing training and validation datasets.
+
+    """
+    if df_historic["ds"].nunique() < min_train + horizon:
+        raise ValueError(
+            "Insufficient data for requested cross-validation. The provided "
+            f"historic data covers {len(df_historic['ds'].unique())}, but "
+            f"the minimum training size is {min_train} and horizon is "
+            f"{horizon}."
+        )
+
+    train = []
+    test = []
+    sample = df_historic.copy()
+
+    while sample["ds"].nunique() >= min_train + horizon:
+
+        # Split into training and test data
+        train_df, test_df = split_train_test(sample, horizon)
+        train.append(train_df)
+        test.append(test_df)
+
+        # Remove days from the end of sample (number removed = step)
+        sample_end = sample["ds"].max() - dt.timedelta(days=step - 1)
+        sample = sample[sample["ds"] < sample_end].copy()
+
+    return train, test

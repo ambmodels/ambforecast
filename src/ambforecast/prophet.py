@@ -1,9 +1,23 @@
 """Prophet forecast."""
 
+import logging
+
+import cmdstanpy
 from prophet import Prophet
 
 
-def predict_prophet(historic, holidays, forecast_length, metric):
+def predict_prophet(
+    # Data and settings for the forecast
+    historic,
+    holidays,
+    forecast_length,
+    interval_width=0.95,
+    # Prophet parameters
+    weekly_seasonality=True,
+    yearly_seasonality=True,
+    changepoint_range=0.8,
+    changepoint_prior_scale=0.05,
+):
     """Predict future demand using Prophet.
 
     Parameters
@@ -20,8 +34,23 @@ def predict_prophet(historic, holidays, forecast_length, metric):
         been filtered to the relevant county.
     forecast_length : int
         Number of days to forecast.
-    metric : str
-        Name of metric being forecast - used to choose changepoint parameters.
+    interval_width : float
+        Width of the prediction intervals - for example, 0.95 will produce
+        95% prediction intervals.
+    weekly_seasonality : bool
+        Whether to fit weekly seasonality, which is a repeating pattern within
+        a single week (e.g., peaks on certain days of the week).
+    yearly_seasonality : bool
+        Whether to fit yearly seasonality, which is a repeating pattern across
+        a calendar year (e.g., peaks in certain seasons).
+    changepoint_range : float
+        Proportion of history in which trend changepoints will be estimated.
+        Uses Prophet default (0.8) if not specified.
+    changepoint_prior_scale:
+        Parameter modulating the flexibility of the automatic changepoint
+        selection. Large values will allow many changepoints, small values
+        will allow few changepoints. Uses Prophet default (0.05) if not
+        specified.
 
     Returns
     -------
@@ -29,22 +58,19 @@ def predict_prophet(historic, holidays, forecast_length, metric):
         Forecast dataframe.
 
     """
-    if metric == "Responses":
-        changepoint_range = 1
-        changepoint_prior = 0.5
-    else:
-        # default values
-        changepoint_range = 0.8
-        changepoint_prior = 0.05
+    # Disable "start/done processing" from prophet
+    # Have to do within predict_prophet() rather than in notebook so that
+    # workers to keep these settings when running in parallel
+    cmdstanpy.disable_logging()
+    logging.getLogger("cmdstanpy").setLevel(logging.ERROR)
 
     prophet = Prophet(
         holidays=holidays,
+        interval_width=interval_width,
+        weekly_seasonality=weekly_seasonality,
+        yearly_seasonality=yearly_seasonality,
         changepoint_range=changepoint_range,
-        changepoint_prior_scale=changepoint_prior,
-        interval_width=0.95,
-        daily_seasonality=False,
-        weekly_seasonality=True,
-        yearly_seasonality=True,
+        changepoint_prior_scale=changepoint_prior_scale,
     )
 
     prophet.fit(historic)
@@ -62,19 +88,16 @@ def predict_prophet(historic, holidays, forecast_length, metric):
             "yhat",
             "yhat_lower",
             "yhat_upper",
-            "trend",
-            "holidays",
-            "weekly",
-            "yearly",
         ]
     ]
+
     # The lower and upper boundaries from prophet are prediction intervals
     # See: https://facebook.github.io/prophet/docs/diagnostics.html
     forecast = forecast.rename(
         columns={
-            "yhat": "prophet_mean",
-            "yhat_lower": "prophet_pi_lower",
-            "yhat_upper": "prophet_pi_upper",
+            "yhat": "forecast",
+            "yhat_lower": "pi_lower",
+            "yhat_upper": "pi_upper",
         }
     )
 

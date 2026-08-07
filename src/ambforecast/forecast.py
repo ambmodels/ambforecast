@@ -150,7 +150,7 @@ class Forecaster:
         forecast.insert(2, "currency", metric)
         return forecast
 
-    def run(self, scenarios):
+    def run(self, scenarios, base_seed=0):
         """Generate forecasts for all metrics and counties.
 
         Parameters
@@ -161,6 +161,8 @@ class Forecaster:
             (dictionary of named parameters for that method). For example,
             {"name": "arima_baseline", "method": "arima",
             "params": {"order": (1, 1, 1), ...} }.
+        base_seed : int
+            Base seed - when creating seeds, they are add to the base.
 
         """
         # Return an error if any names are duplicate or already in results
@@ -175,7 +177,7 @@ class Forecaster:
             )
 
         pairs = list(self.unique_pairs.itertuples(index=False, name=None))
-        seeds = [i for i in range(len(pairs))]
+        seeds = [base_seed + i for i in range(len(pairs))]
 
         # Loop over scenarios
         for scenario in scenarios:
@@ -275,31 +277,6 @@ def resolve_params(params, metric):
     return resolved
 
 
-def split_train_test(df_historic, horizon):
-    """Split df_historic (full or subset) into training and test data.
-
-    Parameters
-    ----------
-    df_historic : pd.DataFrame
-        Historic data.
-    horizon : int
-        Number of days into future that the data is predicted.
-
-    Returns
-    -------
-    train_df, test_df : tuple[pd.DataFrame, pd.DataFrame]
-        Two subsets of the provided historic data - one for training and one
-        for testing.
-
-    """
-    # Find start date of testing
-    test_start = df_historic["ds"].max() - dt.timedelta(days=horizon - 1)
-    # Split into train and test dataset
-    train_df = df_historic[df_historic["ds"] < test_start]
-    test_df = df_historic[df_historic["ds"] >= test_start]
-    return train_df, test_df
-
-
 def create_rolling_samples(
     df_historic, min_train=365 * 2, horizon=42, step=42
 ):
@@ -348,10 +325,12 @@ def create_rolling_samples(
 
     while sample["ds"].nunique() >= min_train + horizon:
 
-        # Split into training and test data
-        train_df, test_df = split_train_test(sample, horizon)
-        train.append(train_df)
-        test.append(test_df)
+        # Find start date of testing sample
+        test_start = sample["ds"].max() - dt.timedelta(days=horizon - 1)
+
+        # Split into train and test dataset
+        train.append(sample[sample["ds"] < test_start])
+        test.append(sample[sample["ds"] >= test_start])
 
         # Remove days from the end of sample (number removed = step)
         sample_end = sample["ds"].max() - dt.timedelta(days=step - 1)

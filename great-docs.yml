@@ -85,10 +85,11 @@ reference:
     contents:
       - prophet.predict_prophet
       - arima.predict_arima
+      - ensemble.calculate_ensemble
 
   - title: Run forecast
     contents:
-      - forecast.run_forecast
+      - forecast.Forecaster
 
   - title: Analysing results
     contents:

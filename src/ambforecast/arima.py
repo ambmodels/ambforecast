@@ -4,6 +4,7 @@ from datetime import timedelta
 
 import pandas as pd
 import statsmodels.api as sm
+from threadpoolctl import threadpool_limits
 
 
 def _encode_holidays(dates, holiday_dates):
@@ -78,7 +79,16 @@ def predict_arima(historic, holidays, forecast_length, max_iter=50):
         enforce_stationarity=False,
         freq="D",
     )
-    model = model.fit(method_kwargs={"maxiter": max_iter})
+
+    # threadpool_limits is required to ensure consistency on Linux when
+    # running sequentially v.s., in parallel. This is because statsmodels
+    # relies on NumPy/SciPy, which do their maths using BLAS - a library
+    # that can split calculations across multiple threads. Running in
+    # parallel changes how those threads get shared out, which can nudge
+    # the numbers slightly and lead to a different result. Forcing BLAS
+    # to use just one thread keeps things running the same way every time.
+    with threadpool_limits(limits=1):
+        model = model.fit(method_kwargs={"maxiter": max_iter})
 
     # Create index of dates to make prediction for
     prediction_dates = pd.date_range(

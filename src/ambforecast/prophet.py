@@ -10,7 +10,7 @@ def predict_prophet(
     # Data and settings for the forecast
     historic,
     holidays,
-    forecast_length,
+    horizon,
     interval_width=0.95,
     # Prophet parameters
     weekly_seasonality=True,
@@ -32,8 +32,8 @@ def predict_prophet(
         "upper_window" which extend the holiday out to
         [lower_window, upper_window] days around the date. This should have
         been filtered to the relevant county.
-    forecast_length : int
-        Number of days to forecast.
+    horizon : int
+        Number of days into future that the data is predicted.
     interval_width : float
         Width of the prediction intervals - for example, 0.95 will produce
         95% prediction intervals.
@@ -76,7 +76,7 @@ def predict_prophet(
     prophet.fit(historic)
 
     future = prophet.make_future_dataframe(
-        freq="D", periods=forecast_length, include_history=False
+        freq="D", periods=horizon, include_history=False
     )
 
     forecast = prophet.predict(future)

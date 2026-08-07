@@ -20,8 +20,8 @@ class Forecaster:
         Holidays.
     metrics : list[str]
         Metrics to forecast.
-    forecast_length : int
-        Number of days to generate a forecast for.
+    horizon : int
+        Number of days into future that the data is predicted.
     cores : int
         Number of CPU cores to use for parallel execution.
     df_historic : pd.DataFrame
@@ -35,7 +35,7 @@ class Forecaster:
     """
 
     def __init__(
-        self, df_historic, df_holidays, metrics, forecast_length, cores=1
+        self, df_historic, df_holidays, metrics, horizon, cores=1
     ):
         """Initialise with data and settings to use across all forecasts.
 
@@ -49,8 +49,8 @@ class Forecaster:
             holiday), "lower_window", "upper_window" and "county".
         metrics : list[str]
             Metric names (values of "currency") to forecast.
-        forecast_length : int
-            Number of days to generate a forecast for.
+        horizon : int
+            Number of days into future that the data is predicted.
         cores : int
             Number of CPU cores to use for parallel execution. For all
             available cores, set to -1. For sequential execution, set to 1.
@@ -58,7 +58,7 @@ class Forecaster:
         """
         self.df_holidays = df_holidays
         self.metrics = metrics
-        self.forecast_length = forecast_length
+        self.horizon = horizon
         self.cores = cores
 
         # Filter to requested metrics and drop any incomplete rows
@@ -161,14 +161,14 @@ class Forecaster:
             forecast = predict_prophet(
                 historic=historic,
                 holidays=holidays,
-                forecast_length=self.forecast_length,
+                horizon=self.horizon,
                 **params,
             )
         elif method == "arima":
             forecast = predict_arima(
                 historic=historic,
                 holidays=holidays,
-                forecast_length=self.forecast_length,
+                horizon=self.horizon,
                 **params,
             )
         else:

@@ -37,7 +37,7 @@ def predict_arima(
     # Data and settings for the forecast
     historic,
     holidays,
-    forecast_length,
+    horizon,
     interval_width=0.95,
     # ARIMA parameters
     order=(0, 0, 0),
@@ -57,8 +57,8 @@ def predict_arima(
         DataFrame which must include two columns: "ds" (date) and "holiday"
         (name of holiday). This should have been filtered to the relevant
         county.
-    forecast_length : int
-        Number of days to forecast.
+    horizon : int
+        Number of days into future that the data is predicted.
     interval_width : float
         Width of the prediction intervals - for example, 0.95 will produce
         95% prediction intervals.
@@ -120,7 +120,7 @@ def predict_arima(
     # Create index of dates to make prediction for
     prediction_dates = pd.date_range(
         start=arima_historic.index[-1] + timedelta(days=1),
-        periods=forecast_length,
+        periods=horizon,
     )
 
     # Encode holidays for prediction dates
@@ -129,7 +129,7 @@ def predict_arima(
     )
 
     # Get forecast for those dates and extract summary dataframe
-    model_forecast = model.get_forecast(forecast_length, exog=holiday_dummy)
+    model_forecast = model.get_forecast(horizon, exog=holiday_dummy)
     forecast = model_forecast.summary_frame(alpha=1 - interval_width)
 
     # Rearranging/relabelling forecast dataframe

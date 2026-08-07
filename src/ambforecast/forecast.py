@@ -106,8 +106,9 @@ class Forecaster:
             Forecast results.
 
         """
-        if self.cores == 1:
-            print(f"Running {method} forecast for: {metric} - {county}...")
+        print(f"Running {method} forecast for: {metric} - {county}...")
+
+        params = params or {}
 
         # Filter historic data to specified county and metric, then just keep
         # "ds" and "y" col
@@ -122,7 +123,8 @@ class Forecaster:
 
         # Generate forecasts
         if method == "prophet":
-            if seed:
+            if seed is not None:
+                print("setting the seed!")
                 np.random.seed(seed)
             forecast = predict_prophet(
                 historic=historic,

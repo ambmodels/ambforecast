@@ -1,6 +1,6 @@
 """Ensemble forecast."""
 
-def calculate_ensemble(forecast_results, methods):
+def calculate_ensemble(forecast_results, names):
     """Find the average forecast and intervals.
 
     Using the provided table of forecasts, it will group and find the mean
@@ -10,11 +10,11 @@ def calculate_ensemble(forecast_results, methods):
     ----------
     forecast_results : pd.DataFrame
         Dataframe of forecast results returned by Forecaster.results.
-    methods : list[str]
-        List of methods to include in ensemble - these are the names in the
-        "method" column of the Forecaster.results dataframe.
+    names : list[str]
+        List of forecasts to include in ensemble. These are the names in the
+        "name" column of the Forecaster.results dataframe.
     """
-    df = forecast_results[forecast_results["method"].isin(methods)]
+    df = forecast_results[forecast_results["name"].isin(names)]
     ensemble = (
         df.groupby(["county", "currency", "ds"])
         .agg({"forecast": "mean", "pi_lower": "mean", "pi_upper": "mean"})

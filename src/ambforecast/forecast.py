@@ -177,7 +177,7 @@ class Forecaster:
             raise ValueError(f"Unknown method: {method}")
 
         # Add columns with name, county and metric, then save result to list
-        forecast.insert(0, "method", name)
+        forecast.insert(0, "name", name)
         forecast.insert(1, "county", county)
         forecast.insert(2, "currency", metric)
         return forecast
@@ -253,7 +253,7 @@ class Forecaster:
                     forecast_results = self.results,
                     **scenario.get("params", {}),
                 )
-                full_forecast.insert(0, "method", scenario["name"])
+                full_forecast.insert(0, "name", scenario["name"])
 
             else:
                 # Run sequentially

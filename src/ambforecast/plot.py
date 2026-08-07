@@ -13,7 +13,7 @@ def plot_forecast(
     forecast,
     metric,
     county,
-    method,
+    name,
     historic_length,
     forecast_colour,
 ):
@@ -29,8 +29,9 @@ def plot_forecast(
         Name of metric.
     county : str
         Name of county.
-    method : str
-        Either "arima", "ensemble" or "prophet".
+    name : str
+        Name of the forecast to plot - corresponds to "name" column in the
+        forecast results dataframe.
     historic_length : int
         Number of days of data to include from the historic data. For example,
         to show 6 weeks of actual data before the forecast, set to 6*7.
@@ -38,22 +39,21 @@ def plot_forecast(
         Forecast colour.
 
     """
-    mean_col = f"{method}_mean"
-    lower_col = f"{method}_pi_lower"
-    upper_col = f"{method}_pi_upper"
-
     # Get the final X days specified of the historic data
     date_min = df_historic["ds"].max() - dt.timedelta(days=historic_length - 1)
     historic_finaldays = df_historic[df_historic["ds"] >= date_min]
-
     historic_plot = historic_finaldays.loc[
         (historic_finaldays["currency"] == metric)
         & (historic_finaldays["ora"] == county),
         ["ds", "y"],
     ]
+
+    # Filter to the relevant forecast
     forecast_plot = forecast.loc[
-        (forecast["currency"] == metric) & (forecast["county"] == county),
-        ["ds", mean_col, lower_col, upper_col],
+        (forecast["currency"] == metric)
+        & (forecast["county"] == county)
+        & (forecast["name"] == name),
+        ["ds", "forecast", "pi_lower", "pi_upper"],
     ]
 
     df = pd.concat([historic_plot, forecast_plot]).reset_index(drop=True)
@@ -61,11 +61,11 @@ def plot_forecast(
     fig, ax = plt.subplots(figsize=(12, 5))
 
     ax.plot(df["ds"], df["y"], color="black", label="Actual")
-    ax.plot(df["ds"], df[mean_col], color=forecast_colour, label="Forecast")
+    ax.plot(df["ds"], df["forecast"], color=forecast_colour, label="Forecast")
     ax.fill_between(
         df["ds"],
-        df[lower_col],
-        df[upper_col],
+        df["pi_lower"],
+        df["pi_upper"],
         color=forecast_colour,
         alpha=0.2,
         label="95% Prediction Interval",
@@ -95,7 +95,7 @@ def plot_forecast(
 
     ax.set_xlabel("Date")
     ax.set_ylabel(metric)
-    ax.set_title(f"{county} {metric} {method}")
+    ax.set_title(f"{county} {metric} {name}")
     ax.grid(alpha=0.3)
     ax.legend(loc="lower right")
 

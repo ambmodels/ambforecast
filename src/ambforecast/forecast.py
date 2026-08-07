@@ -1,11 +1,13 @@
 """Run forecast."""
 
 from collections import Counter
+
 import numpy as np
 import pandas as pd
 from joblib import Parallel, cpu_count, delayed
 
 from .arima import predict_arima
+from .ensemble import calculate_ensemble
 from .prophet import predict_prophet
 
 
@@ -209,7 +211,7 @@ class Forecaster:
             if name or method or params:
                 raise ValueError(
                     "Pass either 'scenarios' OR 'name/method/params', ",
-                    "not both."
+                    "not both.",
                 )
             scenario_list = scenarios
         # If scenarios is not provided, make sure have name + method
@@ -217,7 +219,7 @@ class Forecaster:
             if name is None or method is None:
                 raise ValueError(
                     "When 'scenarios' is not provided, 'name' and 'method' ",
-                    "are required."
+                    "are required.",
                 )
             scenario_list = [
                 {
@@ -244,45 +246,57 @@ class Forecaster:
         for scenario in scenario_list:
             print(f"Running scenario: {scenario}")
 
-            # Run sequentially
-            if self.cores == 1:
-                forecast_list = [
-                    self.generate_forecast(
-                        county=county,
-                        metric=metric,
-                        method=scenario["method"],
-                        name=scenario["name"],
-                        params=scenario.get("params", {}),
-                        seed=seed,
-                    )
-                    for (county, metric), seed in zip(
-                        pairs, seeds, strict=True
-                    )
-                ]
-            # Run in parallel
-            else:
-                # Check number of cores is valid
-                valid_cores = [-1] + list(range(1, cpu_count()))
-                if self.cores not in valid_cores:
-                    raise ValueError(
-                        f"Invalid cores: {self.cores}. Must be one of: "
-                        + f"{valid_cores}."
-                    )
-                forecast_list = Parallel(n_jobs=self.cores)(
-                    delayed(self.generate_forecast)(
-                        county=county,
-                        metric=metric,
-                        method=scenario["method"],
-                        name=scenario["name"],
-                        params=scenario.get("params", {}),
-                        seed=seed,
-                    )
-                    for (county, metric), seed in zip(
-                        pairs, seeds, strict=True
-                    )
+            # Ensemble if just a simple groupby operation so don't need to
+            # use generate_forecast, which runs all paris in a loop
+            if scenario["method"] == "ensemble":
+                full_forecast = calculate_ensemble(
+                    forecast_results = self.results,
+                    **scenario.get("params", {}),
                 )
+                full_forecast.insert(0, "method", scenario["name"])
+
+            else:
+                # Run sequentially
+                if self.cores == 1:
+                    forecast_list = [
+                        self.generate_forecast(
+                            county=county,
+                            metric=metric,
+                            method=scenario["method"],
+                            name=scenario["name"],
+                            params=scenario.get("params", {}),
+                            seed=seed,
+                        )
+                        for (county, metric), seed in zip(
+                            pairs, seeds, strict=True
+                        )
+                    ]
+                # Run in parallel
+                else:
+                    # Check number of cores is valid
+                    valid_cores = [-1] + list(range(1, cpu_count()))
+                    if self.cores not in valid_cores:
+                        raise ValueError(
+                            f"Invalid cores: {self.cores}. Must be one of: "
+                            + f"{valid_cores}."
+                        )
+                    forecast_list = Parallel(n_jobs=self.cores)(
+                        delayed(self.generate_forecast)(
+                            county=county,
+                            metric=metric,
+                            method=scenario["method"],
+                            name=scenario["name"],
+                            params=scenario.get("params", {}),
+                            seed=seed,
+                        )
+                        for (county, metric), seed in zip(
+                            pairs, seeds, strict=True
+                        )
+                    )
+                full_forecast = pd.concat(forecast_list)
+
             # Store results for this scenario by name
-            self.results_dict[scenario["name"]] = pd.concat(forecast_list)
+            self.results_dict[scenario["name"]] = full_forecast
 
     @property
     def results(self):

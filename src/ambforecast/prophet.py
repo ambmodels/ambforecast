@@ -1,11 +1,23 @@
 """Prophet forecast."""
 
-import cmdstanpy
 import logging
+
+import cmdstanpy
 from prophet import Prophet
 
 
-def predict_prophet(historic, holidays, forecast_length, metric):
+def predict_prophet(
+    # Data and settings for the forecast
+    historic,
+    holidays,
+    forecast_length,
+    interval_width=0.95,
+    # Prophet parameters
+    weekly_seasonality=True,
+    yearly_seasonality=True,
+    changepoint_range=0.8,
+    changepoint_prior_scale=0.05,
+):
     """Predict future demand using Prophet.
 
     Parameters
@@ -22,8 +34,23 @@ def predict_prophet(historic, holidays, forecast_length, metric):
         been filtered to the relevant county.
     forecast_length : int
         Number of days to forecast.
-    metric : str
-        Name of metric being forecast - used to choose changepoint parameters.
+    interval_width : float
+        Width of the prediction intervals - for example, 0.95 will produce
+        95% prediction intervals.
+    weekly_seasonality : bool
+        Whether to fit weekly seasonality, which is a repeating pattern within
+        a single week (e.g., peaks on certain days of the week).
+    yearly_seasonality : bool
+        Whether to fit yearly seasonality, which is a repeating pattern across
+        a calendar year (e.g., peaks in certain seasons).
+    changepoint_range : float
+        Proportion of history in which trend changepoints will be estimated.
+        Uses Prophet default (0.8) if not specified.
+    changepoint_prior_scale:
+        Parameter modulating the flexibility of the automatic changepoint
+        selection. Large values will allow many changepoints, small values
+        will allow few changepoints. Uses Prophet default (0.05) if not
+        specified.
 
     Returns
     -------
@@ -37,22 +64,13 @@ def predict_prophet(historic, holidays, forecast_length, metric):
     cmdstanpy.disable_logging()
     logging.getLogger("cmdstanpy").setLevel(logging.ERROR)
 
-    if metric == "Responses":
-        changepoint_range = 1
-        changepoint_prior = 0.5
-    else:
-        # default values
-        changepoint_range = 0.8
-        changepoint_prior = 0.05
-
     prophet = Prophet(
         holidays=holidays,
+        interval_width=interval_width,
+        weekly_seasonality=weekly_seasonality,
+        yearly_seasonality=yearly_seasonality,
         changepoint_range=changepoint_range,
-        changepoint_prior_scale=changepoint_prior,
-        interval_width=0.95,
-        daily_seasonality=False,
-        weekly_seasonality=True,
-        yearly_seasonality=True,
+        changepoint_prior_scale=changepoint_prior_scale,
     )
 
     prophet.fit(historic)

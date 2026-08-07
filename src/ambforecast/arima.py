@@ -31,7 +31,18 @@ def _encode_holidays(dates, holiday_dates):
     ).astype(int)
 
 
-def predict_arima(historic, holidays, forecast_length, max_iter=50):
+def predict_arima(
+    # Data and settings for the forecast
+    historic,
+    holidays,
+    forecast_length,
+    interval_width=0.95,
+    # ARIMA parameters
+    order=(0, 0, 0),
+    seasonal_order=(0, 0, 0, 0),
+    enforce_stationarity=True,
+    max_iter=50,
+):
     """Predict future demand using ARIMA.
 
     Parameters
@@ -46,11 +57,24 @@ def predict_arima(historic, holidays, forecast_length, max_iter=50):
         county.
     forecast_length : int
         Number of days to forecast.
+    interval_width : float
+        Width of the prediction intervals - for example, 0.95 will produce
+        95% prediction intervals.
+    order : tuple
+        The (p, d, q) order of the model. If none specified, will use the
+        ARIMA default (0, 0, 0).
+    seasonal_order : tuple
+        The (P, D, Q, s) order of the seasonal component of the model. If
+        none specified, will use the ARIMA default (0, 0, 0, 0).
+    enforce_stationarity : bool
+        Whether or not to require the autoregressive parameters to correspond
+        to a stationarity process. If none specified, will use the ARIMA
+        default (True).
     max_iter: int
-        The maximum number of iterations. Originally, we were using the
-        statsmodels default (50), but had a warning "Maximum Likelihood
-        optimisation failed to converge". This warning can be resolved by
-        increasing the maximum.
+        The maximum number of iterations. If none specified, will use the
+        ARIMA default (50) - although we did find this produced a warning that
+        "Maximum Likelihood optimisation failed to converge". This warning can
+        be resolved by increasing the maximum.
 
     Returns
     -------
@@ -74,9 +98,9 @@ def predict_arima(historic, holidays, forecast_length, max_iter=50):
     model = sm.tsa.arima.ARIMA(
         endog=arima_historic,
         exog=holiday_dummy,
-        order=(1, 1, 3),
-        seasonal_order=(1, 0, 1, 7),
-        enforce_stationarity=False,
+        order=order,
+        seasonal_order=seasonal_order,
+        enforce_stationarity=enforce_stationarity,
         freq="D",
     )
 
@@ -103,7 +127,7 @@ def predict_arima(historic, holidays, forecast_length, max_iter=50):
 
     # Get forecast for those dates and extract summary dataframe
     model_forecast = model.get_forecast(forecast_length, exog=holiday_dummy)
-    forecast = model_forecast.summary_frame(alpha=0.05)
+    forecast = model_forecast.summary_frame(alpha=1 - interval_width)
 
     # Rearranging/relabelling forecast dataframe
     # statsmodels ARIMA labels these as confidence intervals, but they are

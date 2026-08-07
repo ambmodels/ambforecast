@@ -1,5 +1,6 @@
 """Run forecast."""
 
+from collections import Counter
 import numpy as np
 import pandas as pd
 from joblib import Parallel, cpu_count, delayed
@@ -82,7 +83,38 @@ class Forecaster:
             + f"{forecast_start_date.strftime('%A %d %B %Y')}"
         )
 
-    def generate_forecast(self, county, metric, method, name, params=None, seed=None):
+    @staticmethod
+    def resolve_params(params, metric):
+        """Resolve params for a specific metric.
+
+        Any parameter value can be given as a plain value (used for all
+        metrics) or as a dict keyed by metric name.
+
+        Parameters
+        ----------
+        params : dict
+            Parameters, where each value is either a plain value or a
+            dict mapping metric name to value.
+        metric : str
+            Metric to resolve params for.
+
+        Returns
+        -------
+        dict
+            Params with any per-metric dicts resolved to a single value.
+
+        """
+        resolved = {}
+        for key, value in params.items():
+            if isinstance(value, dict) and metric in value:
+                resolved[key] = value[metric]
+            else:
+                resolved[key] = value
+        return resolved
+
+    def generate_forecast(
+        self, county, metric, method, name, params=None, seed=None
+    ):
         """Generate single forecast.
 
         Parameters
@@ -106,9 +138,10 @@ class Forecaster:
             Forecast results.
 
         """
-        print(f"Running {method} forecast for: {metric} - {county}...")
-
+        # Set-up params object - including fetching relevant params for that
+        # metric, if provided as dict with different params for each metric
         params = params or {}
+        params = self.resolve_params(params, metric)
 
         # Filter historic data to specified county and metric, then just keep
         # "ds" and "y" col
@@ -124,21 +157,19 @@ class Forecaster:
         # Generate forecasts
         if method == "prophet":
             if seed is not None:
-                print("setting the seed!")
                 np.random.seed(seed)
             forecast = predict_prophet(
                 historic=historic,
                 holidays=holidays,
                 forecast_length=self.forecast_length,
-                metric=metric,
-                **params
+                **params,
             )
         elif method == "arima":
             forecast = predict_arima(
                 historic=historic,
                 holidays=holidays,
                 forecast_length=self.forecast_length,
-                **params
+                **params,
             )
         else:
             raise ValueError(f"Unknown method: {method}")
@@ -169,19 +200,25 @@ class Forecaster:
             Name for the scenario.
         method : str
             Method to use - either "arima" or "prophet".
-        parms : dict
+        params : dict
             Parameters for that method.
 
         """
         # If scenarios is provided, shouldn't also provide name/method/params
         if scenarios is not None:
             if name or method or params:
-                raise ValueError("Pass either 'scenarios' OR 'name/method/params', not both.")
+                raise ValueError(
+                    "Pass either 'scenarios' OR 'name/method/params', ",
+                    "not both."
+                )
             scenario_list = scenarios
         # If scenarios is not provided, make sure have name + method
         else:
             if name is None or method is None:
-                raise ValueError("When 'scenarios' is not provided, 'name' and 'method' are required.")
+                raise ValueError(
+                    "When 'scenarios' is not provided, 'name' and 'method' ",
+                    "are required."
+                )
             scenario_list = [
                 {
                     "name": name,
@@ -189,10 +226,16 @@ class Forecaster:
                     "params": params,
                 }
             ]
-        # TODO: Check if names are in existing names in results_list
-        # TODO: Check for duplicate names in scenarios if provided scenarios
-
-        # TODO: Run scenarios in parallel too?
+        # Return an error if any names are duplicate or already in results
+        names = [scenario["name"] for scenario in scenario_list]
+        duplicates = [i for i, count in Counter(names).items() if count > 1]
+        existing = set(names).intersection(self.results_dict.keys())
+        if duplicates or existing:
+            raise ValueError(
+                "The provided scenario names are either duplicates or "
+                "already exist in the results_dict. "
+                f"Duplicates: {duplicates}. Pre-existing {existing}."
+            )
 
         pairs = list(self.unique_pairs.itertuples(index=False, name=None))
         seeds = [i for i in range(len(pairs))]
@@ -210,9 +253,11 @@ class Forecaster:
                         method=scenario["method"],
                         name=scenario["name"],
                         params=scenario.get("params", {}),
-                        seed=seed
+                        seed=seed,
                     )
-                    for (county, metric), seed in zip(pairs, seeds, strict=True)
+                    for (county, metric), seed in zip(
+                        pairs, seeds, strict=True
+                    )
                 ]
             # Run in parallel
             else:
@@ -230,9 +275,11 @@ class Forecaster:
                         method=scenario["method"],
                         name=scenario["name"],
                         params=scenario.get("params", {}),
-                        seed=seed
+                        seed=seed,
                     )
-                    for (county, metric), seed in zip(pairs, seeds, strict=True)
+                    for (county, metric), seed in zip(
+                        pairs, seeds, strict=True
+                    )
                 )
             # Store results for this scenario by name
             self.results_dict[scenario["name"]] = pd.concat(forecast_list)
@@ -245,5 +292,6 @@ class Forecaster:
         -------
         pd.DataFrame
             Single dataframe with all forecast results.
+
         """
         return pd.concat(list(self.results_dict.values()), ignore_index=True)

@@ -13,160 +13,183 @@ from forecast_tools.metrics import (
 from .forecast import Forecaster
 
 
-def create_rolling_samples(
-    df_historic, min_train=365 * 2, horizon=42, step=42
-):
-    """Create samples for cross-validation with rolling forecast origin.
+class CrossValidator:
+    """Run cross-validation with rolling forecast origin.
 
-    Cross-validation with rolling forecast origin creates overlapping sets of
-    training and test data. Each sample trains on data available up to a
-    forecast origin and validates forecasts for the following `horizon` days.
-
-    Samples are generated from the most recent data backwards. `step` specifies
-    how many days earlier the forecast origin moves between samples. For
-    example, `step=7` creates samples with forecast origins 7 days apart.
-
-    Parameters
-    ----------
-    df_historic : pd.DataFrame
-        Historic data.
-    min_train : int
-        Minimum number of days to include in training sample. By default, set
-        to 2 years as that allows detection of yearly seasonality (e.g.,
-        Prophet minimum is 2 years).
-    horizon : int
-        Number of days into future that the data is predicted.
-    step : int
-        How many days to move by before creating a new sample. Warning:
-        using a step of 365 will produce test samples all at approximately the
-        same time of year.
-
-    Returns
-    -------
-    train, val : tuple[list[pd.DataFrame],list[pd.DataFrame]]
-        Two lists containing training and validation datasets.
-
+    This will create overlapping sets of training and test data. Each sample
+    trains on data available up to a forecast origin and generates forecasts
+    for the horizon after that.
     """
-    if df_historic["ds"].nunique() < min_train + horizon:
-        raise ValueError(
-            "Insufficient data for requested cross-validation. The provided "
-            f"historic data covers {len(df_historic['ds'].unique())}, but "
-            f"the minimum training size is {min_train} and horizon is "
-            f"{horizon}."
-        )
 
-    train = []
-    test = []
-    sample = df_historic.copy()
+    def __init__(
+        self,
+        df_historic,
+        df_holidays,
+        metrics,
+        horizon=42,
+        step=42,
+        min_train=365 * 2,
+        cores=-1,
+    ):
+        """Initialise with data and settings for cross-validation.
 
-    while sample["ds"].nunique() >= min_train + horizon:
-        # Find start date of testing sample
-        test_start = sample["ds"].max() - dt.timedelta(days=horizon - 1)
+        Parameters
+        ----------
+        df_historic : pd.DataFrame
+            Historic data.
+        df_holidays : pd.DataFrame
+            Holidays data.
+        metrics : list[str]
+            Metrics to forecast.
+        horizon : int
+            Number of days into future that the data is predicted.
+        step : int
+            How many days to move by before creating a new sample. Warning:
+            using a step of 365 will produce test samples all at approximately
+            the same time of year.
+        min_train : int
+            Minimum number of days to include in training sample. By default,
+            set to 2 years as that allows detection of yearly seasonality
+            (e.g., Prophet minimum is 2 years).
+        cores : int
+            Number of CPU cores to use for parallel execution. For all
+            available cores, set to -1. For sequential execution, set to 1.
 
-        # Split into train and test dataset
-        train.append(sample[sample["ds"] < test_start])
-        test.append(sample[sample["ds"] >= test_start])
+        """
+        self.df_historic = df_historic
+        self.df_holidays = df_holidays
+        self.metrics = metrics
+        self.horizon = horizon
+        self.step = step
+        self.min_train = min_train
+        self.cores = cores
 
-        # Remove days from the end of sample (number removed = step)
-        sample_end = sample["ds"].max() - dt.timedelta(days=step - 1)
-        sample = sample[sample["ds"] < sample_end].copy()
+    def create_rolling_samples(self):
+        """Create samples for cross-validation with rolling forecast origin.
 
-    return train, test
+        Samples are generated from the most recent data backwards. `step`
+        specifies how many days earlier the forecast origin moves between
+        samples. For example, `step=7` creates samples with forecast origins
+        7 days apart.
 
+        Returns
+        -------
+        train, val : tuple[list[pd.DataFrame],list[pd.DataFrame]]
+            Two lists containing training and validation datasets.
 
-def cross_validation(df_historic, df_holidays, metrics, scenario, horizon, step, cores):
-    """Perform cross-validation for the chosen model.
-
-    Parameters
-    ----------
-    df_historic : pd.DataFrame
-        Historic data.
-    df_holidays : pd.DataFrame
-        Holidays data.
-    metrics : list
-        Metrics.
-    scenario : dict
-        Single scenario dictionary in suitable format for Forecaster.run().
-    horizon : int
-        Number of days into future that the data is predicted.
-    step : int
-        How many days to move by before creating a new sample. Warning:
-        using a step of 365 will produce test samples all at approximately the
-        same time of year.
-    cores : int
-        Cores.
-
-    Returns
-    -------
-    pd.DataFrame
-        Dataframe with errors for each county, metric and cross-validation
-        fold.
-
-    """
-    # Create samples for cross-validation with rolling forecast origin
-    train, test = create_rolling_samples(df_historic, step=step)
-
-    cv_forecasts = []
-    for i in range(len(train)):
-        # Fit model using training sample
-        forecaster = Forecaster(
-            df_historic=train[i],
-            df_holidays=df_holidays,
-            metrics=metrics,
-            horizon=horizon,
-            cores=cores,
-        )
-        # Set name for cross-validation scenario and run forecaster
-        scenario["name"] = f"cross_validation_{i}"
-        forecaster.run([scenario], base_seed=i * 100000)
-        # Save results dataframe to cv_forecasts
-        cv_forecasts.append(forecaster.results)
-
-    errors_list = []
-
-    # Loop through all the counties and metrics
-    pairs = list(forecaster.unique_pairs.itertuples(index=False, name=None))
-    for county, metric in pairs:
-        # Loop through all the cross-validation samples
-        for fold, (train_fold, test_fold, cv_fold) in enumerate(
-            zip(train, test, cv_forecasts, strict=True)
-        ):
-            # Filter the datasets to the relevant county and metric
-            train_subset = train_fold[
-                (train_fold["ora"] == county)
-                & (train_fold["currency"] == metric)
-            ]
-            test_subset = test_fold[
-                (test_fold["ora"] == county)
-                & (test_fold["currency"] == metric)
-            ]
-            cv_subset = cv_fold[
-                (cv_fold["county"] == county) & (cv_fold["currency"] == metric)
-            ]
-
-            errors_list.append(
-                {
-                    "county": county,
-                    "metric": metric,
-                    "fold": fold,
-                    "rmse": root_mean_squared_error(
-                        y_true=test_subset["y"], y_pred=cv_subset["forecast"]
-                    ),
-                    "mase": mean_absolute_scaled_error(
-                        y_true=test_subset["y"],
-                        y_pred=cv_subset["forecast"],
-                        y_train=train_subset["y"],
-                    ),
-                    "smape": symmetric_mean_absolute_percentage_error(
-                        y_true=test_subset["y"], y_pred=cv_subset["forecast"]
-                    ),
-                    "coverage": coverage(
-                        y_true=test_subset["y"],
-                        pred_intervals=cv_subset[
-                            ["pi_lower", "pi_upper"]
-                        ].values.tolist(),
-                    ),
-                }
+        """
+        if self.df_historic["ds"].nunique() < self.min_train + self.horizon:
+            raise ValueError(
+                "Insufficient data for requested cross-validation. The "
+                f"provided historic data covers "
+                f"{len(self.df_historic['ds'].unique())}, but the minimum "
+                f"training size is {self.min_train} and horizon is "
+                f"{self.horizon}."
             )
 
-    return pd.DataFrame(errors_list)
+        train = []
+        test = []
+        sample = self.df_historic.copy()
+
+        while sample["ds"].nunique() >= self.min_train + self.horizon:
+            # Find start date of testing sample
+            test_start = sample["ds"].max() - dt.timedelta(
+                days=self.horizon - 1
+            )
+
+            # Split into train and test dataset
+            train.append(sample[sample["ds"] < test_start])
+            test.append(sample[sample["ds"] >= test_start])
+
+            # Remove days from the end of sample (number removed = step)
+            sample_end = sample["ds"].max() - dt.timedelta(days=self.step - 1)
+            sample = sample[sample["ds"] < sample_end].copy()
+
+        return train, test
+
+    def run(self, scenario):
+        """Perform cross-validation for the chosen model.
+
+        Parameters
+        ----------
+        scenario : dict
+            Single scenario dictionary in suitable format for Forecaster.run().
+
+        Returns
+        -------
+        pd.DataFrame
+            Dataframe with errors for each county, metric and cross-validation
+            fold.
+
+        """
+        # Create samples for cross-validation with rolling forecast origin
+        train, test = self.create_rolling_samples()
+
+        cv_forecasts = []
+        for i in range(len(train)):
+            # Fit model using training sample
+            forecaster = Forecaster(
+                df_historic=train[i],
+                df_holidays=self.df_holidays,
+                metrics=self.metrics,
+                horizon=self.horizon,
+                cores=self.cores,
+            )
+            # Set name for cross-validation scenario and run forecaster
+            scenario["name"] = f"cross_validation_{i}"
+            forecaster.run([scenario], base_seed=i * 100000)
+            # Save results dataframe to cv_forecasts
+            cv_forecasts.append(forecaster.results)
+
+        errors_list = []
+
+        # Loop through all the counties and metrics
+        pairs = list(
+            forecaster.unique_pairs.itertuples(index=False, name=None)
+        )
+        for county, metric in pairs:
+            # Loop through all the cross-validation samples
+            for fold, (train_fold, test_fold, cv_fold) in enumerate(
+                zip(train, test, cv_forecasts, strict=True)
+            ):
+                # Filter the datasets to the relevant county and metric
+                train_subset = train_fold[
+                    (train_fold["ora"] == county)
+                    & (train_fold["currency"] == metric)
+                ]
+                test_subset = test_fold[
+                    (test_fold["ora"] == county)
+                    & (test_fold["currency"] == metric)
+                ]
+                cv_subset = cv_fold[
+                    (cv_fold["county"] == county)
+                    & (cv_fold["currency"] == metric)
+                ]
+
+                errors_list.append(
+                    {
+                        "county": county,
+                        "metric": metric,
+                        "fold": fold,
+                        "rmse": root_mean_squared_error(
+                            y_true=test_subset["y"],
+                            y_pred=cv_subset["forecast"],
+                        ),
+                        "mase": mean_absolute_scaled_error(
+                            y_true=test_subset["y"],
+                            y_pred=cv_subset["forecast"],
+                            y_train=train_subset["y"],
+                        ),
+                        "smape": symmetric_mean_absolute_percentage_error(
+                            y_true=test_subset["y"],
+                            y_pred=cv_subset["forecast"],
+                        ),
+                        "coverage": coverage(
+                            y_true=test_subset["y"],
+                            pred_intervals=cv_subset[
+                                ["pi_lower", "pi_upper"]
+                            ].values.tolist(),
+                        ),
+                    }
+                )
+        return pd.DataFrame(errors_list)

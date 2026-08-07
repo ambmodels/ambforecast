@@ -1,9 +1,11 @@
 """ARIMA forecast."""
 
+import warnings
 from datetime import timedelta
 
 import pandas as pd
 import statsmodels.api as sm
+from statsmodels.tools.sm_exceptions import ConvergenceWarning
 from threadpoolctl import threadpool_limits
 
 
@@ -111,7 +113,8 @@ def predict_arima(
     # parallel changes how those threads get shared out, which can nudge
     # the numbers slightly and lead to a different result. Forcing BLAS
     # to use just one thread keeps things running the same way every time.
-    with threadpool_limits(limits=1):
+    with threadpool_limits(limits=1), warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=ConvergenceWarning)
         model = model.fit(method_kwargs={"maxiter": max_iter})
 
     # Create index of dates to make prediction for

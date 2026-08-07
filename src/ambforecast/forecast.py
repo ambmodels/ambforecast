@@ -150,54 +150,21 @@ class Forecaster:
         forecast.insert(2, "currency", metric)
         return forecast
 
-    def run(self, scenarios=None, *, name=None, method=None, params=None):
+    def run(self, scenarios):
         """Generate forecasts for all metrics and counties.
-
-        Can run as single scenario:
-        >> forecaster.run(name="arima_current_version",
-                            method="arima",
-                            params={"order": (1, 1, 1), ...})
-
-        Or can run a list of multiple scenarios:
-        >> forecaster.run(scenarios=[{...}, {...}])
 
         Parameters
         ----------
         scenarios : list[dict]
-            List of dictionaries, where each dictionary has the keys "name",
-            "method" and "params".
-        name : str
-            Name for the scenario.
-        method : str
-            Method to use - either "arima" or "prophet".
-        params : dict
-            Parameters for that method.
+            List of dictionaries, where each dictionary has the keys "name"
+            (label), "method" (one of the supported methods), and "params"
+            (dictionary of named parameters for that method). For example,
+            {"name": "arima_baseline", "method": "arima",
+            "params": {"order": (1, 1, 1), ...} }.
 
         """
-        # If scenarios is provided, shouldn't also provide name/method/params
-        if scenarios is not None:
-            if name or method or params:
-                raise ValueError(
-                    "Pass either 'scenarios' OR 'name/method/params', ",
-                    "not both.",
-                )
-            scenario_list = scenarios
-        # If scenarios is not provided, make sure have name + method
-        else:
-            if name is None or method is None:
-                raise ValueError(
-                    "When 'scenarios' is not provided, 'name' and 'method' ",
-                    "are required.",
-                )
-            scenario_list = [
-                {
-                    "name": name,
-                    "method": method,
-                    "params": params,
-                }
-            ]
         # Return an error if any names are duplicate or already in results
-        names = [scenario["name"] for scenario in scenario_list]
+        names = [scenario["name"] for scenario in scenarios]
         duplicates = [i for i, count in Counter(names).items() if count > 1]
         existing = set(names).intersection(self.results_dict.keys())
         if duplicates or existing:
@@ -211,7 +178,7 @@ class Forecaster:
         seeds = [i for i in range(len(pairs))]
 
         # Loop over scenarios
-        for scenario in scenario_list:
+        for scenario in scenarios:
             print(f"Running scenario: {scenario}")
 
             # Ensemble if just a simple groupby operation so don't need to

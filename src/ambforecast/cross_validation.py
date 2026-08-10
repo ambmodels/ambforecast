@@ -117,8 +117,9 @@ class CrossValidator:
 
         Returns
         -------
-        pd.DataFrame
-            Dataframe with errors for each county, metric and cross-validation
+        forecasts, errors : tuple[pd.DataFrame, pd.DataFrame]
+            First dataframe contains the forecast results, and second
+            contains the errors for each county, metric and cross-validation
             fold.
 
         """
@@ -192,4 +193,7 @@ class CrossValidator:
                         ),
                     }
                 )
-        return pd.DataFrame(errors_list)
+
+        forecasts = pd.concat(cv_forecasts, ignore_index=True)
+        errors = pd.DataFrame(errors_list)
+        return forecasts, errors

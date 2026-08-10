@@ -74,12 +74,13 @@ class Forecaster:
         # Empty dict to store forecast results
         self.results_dict = {}
 
-        # Print the forecast start date
+        # Print the forecast start date and horizon
         forecast_start_date = df_historic["ds"].max() + pd.Timedelta(days=1)
         print(
             "Forecast start date: "
             + f"{forecast_start_date.strftime('%A %d %B %Y')}"
         )
+        print(f"Forecast horizon: {self.horizon} days.")
 
     def generate_forecast(
         self, county, metric, method, name, params=None, seed=None

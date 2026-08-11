@@ -17,6 +17,11 @@ def predict_prophet(
     yearly_seasonality=True,
     changepoint_range=0.8,
     changepoint_prior_scale=0.05,
+    # Additional regressors: data and parameters
+    regressors=None,
+    regressors_data=None,
+    # Whether to show the Prophet plot_components plot
+    plot_components=False
 ):
     """Predict future demand using Prophet.
 
@@ -46,11 +51,23 @@ def predict_prophet(
     changepoint_range : float
         Proportion of history in which trend changepoints will be estimated.
         Uses Prophet default (0.8) if not specified.
-    changepoint_prior_scale:
+    changepoint_prior_scale : float
         Parameter modulating the flexibility of the automatic changepoint
         selection. Large values will allow many changepoints, small values
         will allow few changepoints. Uses Prophet default (0.05) if not
         specified.
+    regressors : dict of dict
+        Mapping of regressor names to `Prophet.add_regressor` keyword
+        arguments. For example:
+            {
+                "temp": {"prior_scale": 0.5, "mode": "multiplicative"},
+                "rain": {"prior_scale": 0.5, "mode": "multiplicative"},
+            }
+    regressors_data : pd.DataFrame
+        Dataframe containing `ds` plus a column for every configured regressor,
+        which one row per date.
+    plot_components : bool
+        If True, will display the Prophet plot_components figure.
 
     Returns
     -------
@@ -73,13 +90,34 @@ def predict_prophet(
         changepoint_prior_scale=changepoint_prior_scale,
     )
 
+    if regressors_data is not None:
+        for name, options in regressors.items():
+            prophet.add_regressor(name, **options)
+        historic = historic.merge(
+            regressors_data,
+            on="ds",
+            how="left",
+            validate="one_to_one"
+        )
+
     prophet.fit(historic)
 
     future = prophet.make_future_dataframe(
         freq="D", periods=horizon, include_history=False
     )
 
+    if regressors_data is not None:
+        future = future.merge(
+            regressors_data,
+            on="ds",
+            how="left",
+            validate="one_to_one",
+        )
+
     forecast = prophet.predict(future)
+
+    if plot_components:
+        prophet.plot_components(forecast)
 
     # Choose which columns to keep
     forecast = forecast[

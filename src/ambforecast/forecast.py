@@ -34,7 +34,7 @@ class Forecaster:
 
     """
 
-    def __init__(self, df_historic, df_holidays, metrics, horizon, cores=1):
+    def __init__(self, df_historic, df_holidays, metrics, horizon, cores=1, df_regressors=None):
         """Initialise with data and settings to use across all forecasts.
 
         Parameters
@@ -52,12 +52,16 @@ class Forecaster:
         cores : int
             Number of CPU cores to use for parallel execution. For all
             available cores, set to -1. For sequential execution, set to 1.
+        df_regressors : pd.DataFrame
+            Additional regressors. Should have columns "ds", "county", and
+            then the regressor columns.
 
         """
         self.df_holidays = df_holidays
         self.metrics = metrics
         self.horizon = horizon
         self.cores = cores
+        self.df_regressors = df_regressors
 
         # Filter to requested metrics and drop any incomplete rows
         self.df_historic = df_historic[
@@ -123,6 +127,19 @@ class Forecaster:
 
         # Filter holidays to specified county
         holidays = self.df_holidays[self.df_holidays["county"] == county]
+        if holidays.empty:
+            raise ValueError(
+                f"No holiday data found for county: {county}"
+            )
+
+        # Filter additional regressors to specified county
+        regressors_data = None
+        if self.df_regressors is not None:
+            regressors_data = self.df_regressors[self.df_regressors["county"] == county]
+            if regressors_data.empty:
+                raise ValueError(
+                    f"No regressor data found for county: {county}"
+                )
 
         # Generate forecasts
         if method == "prophet":
@@ -132,6 +149,7 @@ class Forecaster:
                 historic=historic,
                 holidays=holidays,
                 horizon=self.horizon,
+                regressors_data=regressors_data,
                 **params,
             )
         elif method == "arima":

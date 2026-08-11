@@ -34,7 +34,7 @@ class Forecaster:
 
     """
 
-    def __init__(self, df_historic, df_holidays, metrics, horizon, cores=1, df_regressors=None):
+    def __init__(self, df_historic, metrics, horizon, cores=1, df_holidays=None, df_regressors=None):
         """Initialise with data and settings to use across all forecasts.
 
         Parameters
@@ -42,9 +42,6 @@ class Forecaster:
         df_historic : pd.DataFrame
             Historic data. Should have columns "ds" (date), "currency"
             (metric), "ora" (county/trust) and "y" (value).
-        df_holidays : pd.DataFrame
-            Holidays. Should have columns "ds" (date), "holiday" (name of
-            holiday), "lower_window", "upper_window" and "county".
         metrics : list[str]
             Metric names (values of "currency") to forecast.
         horizon : int
@@ -52,6 +49,9 @@ class Forecaster:
         cores : int
             Number of CPU cores to use for parallel execution. For all
             available cores, set to -1. For sequential execution, set to 1.
+        df_holidays : pd.DataFrame
+            Holidays. Should have columns "ds" (date), "holiday" (name of
+            holiday), "lower_window", "upper_window" and "county".
         df_regressors : pd.DataFrame
             Additional regressors. Should have columns "ds", "county", and
             then the regressor columns.
@@ -126,11 +126,13 @@ class Forecaster:
         ]
 
         # Filter holidays to specified county
-        holidays = self.df_holidays[self.df_holidays["county"] == county]
-        if holidays.empty:
-            raise ValueError(
-                f"No holiday data found for county: {county}"
-            )
+        holidays = params.pop("holidays", None)
+        if holidays is not None:
+            holidays = holidays[holidays["county"] == county]
+            if holidays.empty:
+                raise ValueError(
+                    f"No holiday data found for county: {county}"
+                )
 
         # Filter additional regressors to specified county
         regressors_data = None
@@ -199,8 +201,6 @@ class Forecaster:
 
         # Loop over scenarios
         for scenario in scenarios:
-            print(f"Running scenario: {scenario}")
-
             # Ensemble if just a simple groupby operation so don't need to
             # use generate_forecast, which runs all paris in a loop
             if scenario["method"] == "ensemble":

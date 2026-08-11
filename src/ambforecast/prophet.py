@@ -9,8 +9,8 @@ from prophet import Prophet
 def predict_prophet(
     # Data and settings for the forecast
     historic,
-    holidays,
     horizon,
+    holidays=None,
     interval_width=0.95,
     # Prophet parameters
     weekly_seasonality=True,
@@ -31,14 +31,14 @@ def predict_prophet(
         DataFrame which must include two columns: "ds" (date) and
         "y" (value). This should have been filtered to the relevant metric
         and county.
+    horizon : int
+        Number of days into future that the data is predicted.
     holidays : pd.DataFrame
         DataFrame which must include two columns: "ds" (date) and
         "holiday" (name of holiday). It can also include "lower_window" and
         "upper_window" which extend the holiday out to
         [lower_window, upper_window] days around the date. This should have
         been filtered to the relevant county.
-    horizon : int
-        Number of days into future that the data is predicted.
     interval_width : float
         Width of the prediction intervals - for example, 0.95 will produce
         95% prediction intervals.
@@ -118,16 +118,6 @@ def predict_prophet(
 
     if plot_components:
         prophet.plot_components(forecast)
-
-    # Choose which columns to keep
-    forecast = forecast[
-        [
-            "ds",
-            "yhat",
-            "yhat_lower",
-            "yhat_upper",
-        ]
-    ]
 
     # The lower and upper boundaries from prophet are prediction intervals
     # See: https://facebook.github.io/prophet/docs/diagnostics.html

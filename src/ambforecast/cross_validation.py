@@ -24,8 +24,8 @@ class CrossValidator:
     def __init__(
         self,
         df_historic,
-        df_holidays,
         metrics,
+        df_holidays=None,
         horizon=42,
         step=42,
         min_train=365 * 2,
@@ -37,10 +37,10 @@ class CrossValidator:
         ----------
         df_historic : pd.DataFrame
             Historic data.
-        df_holidays : pd.DataFrame
-            Holidays data.
         metrics : list[str]
             Metrics to forecast.
+        df_holidays : pd.DataFrame
+            Holidays data.
         horizon : int
             Number of days into future that the data is predicted.
         step : int
@@ -123,6 +123,8 @@ class CrossValidator:
             fold.
 
         """
+        name = scenario["name"]
+
         # Create samples for cross-validation with rolling forecast origin
         train, test = self.create_rolling_samples()
 
@@ -196,4 +198,5 @@ class CrossValidator:
 
         forecasts = pd.concat(cv_forecasts, ignore_index=True)
         errors = pd.DataFrame(errors_list)
+        errors.insert(0, "name", name)
         return forecasts, errors

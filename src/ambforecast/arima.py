@@ -36,8 +36,8 @@ def _encode_holidays(dates, holiday_dates):
 def predict_arima(
     # Data and settings for the forecast
     historic,
-    holidays,
     horizon,
+    holidays=None,
     interval_width=0.95,
     # ARIMA parameters
     order=(0, 0, 0),
@@ -53,12 +53,12 @@ def predict_arima(
         DataFrame which must include two columns: "ds" (date) and
         "y" (value). This should have been filtered to the relevant metric
         and county.
+    horizon : int
+        Number of days into future that the data is predicted.
     holidays : pd.DataFrame
         DataFrame which must include two columns: "ds" (date) and "holiday"
         (name of holiday). This should have been filtered to the relevant
         county.
-    horizon : int
-        Number of days into future that the data is predicted.
     interval_width : float
         Width of the prediction intervals - for example, 0.95 will produce
         95% prediction intervals.

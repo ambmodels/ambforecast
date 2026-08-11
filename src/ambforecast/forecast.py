@@ -20,8 +20,8 @@ class Forecaster:
         Holidays.
     metrics : list[str]
         Metrics to forecast.
-    forecast_length : int
-        Number of days to generate a forecast for.
+    horizon : int
+        Number of days into future that the data is predicted.
     cores : int
         Number of CPU cores to use for parallel execution.
     df_historic : pd.DataFrame
@@ -34,9 +34,7 @@ class Forecaster:
 
     """
 
-    def __init__(
-        self, df_historic, df_holidays, metrics, forecast_length, cores=1
-    ):
+    def __init__(self, df_historic, metrics, horizon, cores=1, df_holidays=None, df_regressors=None):
         """Initialise with data and settings to use across all forecasts.
 
         Parameters
@@ -44,22 +42,26 @@ class Forecaster:
         df_historic : pd.DataFrame
             Historic data. Should have columns "ds" (date), "currency"
             (metric), "ora" (county/trust) and "y" (value).
-        df_holidays : pd.DataFrame
-            Holidays. Should have columns "ds" (date), "holiday" (name of
-            holiday), "lower_window", "upper_window" and "county".
         metrics : list[str]
             Metric names (values of "currency") to forecast.
-        forecast_length : int
-            Number of days to generate a forecast for.
+        horizon : int
+            Number of days into future that the data is predicted.
         cores : int
             Number of CPU cores to use for parallel execution. For all
             available cores, set to -1. For sequential execution, set to 1.
+        df_holidays : pd.DataFrame
+            Holidays. Should have columns "ds" (date), "holiday" (name of
+            holiday), "lower_window", "upper_window" and "county".
+        df_regressors : pd.DataFrame
+            Additional regressors. Should have columns "ds", "county", and
+            then the regressor columns.
 
         """
         self.df_holidays = df_holidays
         self.metrics = metrics
-        self.forecast_length = forecast_length
+        self.horizon = horizon
         self.cores = cores
+        self.df_regressors = df_regressors
 
         # Filter to requested metrics and drop any incomplete rows
         self.df_historic = df_historic[
@@ -76,41 +78,13 @@ class Forecaster:
         # Empty dict to store forecast results
         self.results_dict = {}
 
-        # Print the forecast start date
+        # Print the forecast start date and horizon
         forecast_start_date = df_historic["ds"].max() + pd.Timedelta(days=1)
         print(
             "Forecast start date: "
             + f"{forecast_start_date.strftime('%A %d %B %Y')}"
         )
-
-    @staticmethod
-    def resolve_params(params, metric):
-        """Resolve params for a specific metric.
-
-        Any parameter value can be given as a plain value (used for all
-        metrics) or as a dict keyed by metric name.
-
-        Parameters
-        ----------
-        params : dict
-            Parameters, where each value is either a plain value or a
-            dict mapping metric name to value.
-        metric : str
-            Metric to resolve params for.
-
-        Returns
-        -------
-        dict
-            Params with any per-metric dicts resolved to a single value.
-
-        """
-        resolved = {}
-        for key, value in params.items():
-            if isinstance(value, dict) and metric in value:
-                resolved[key] = value[metric]
-            else:
-                resolved[key] = value
-        return resolved
+        print(f"Forecast horizon: {self.horizon} days.")
 
     def generate_forecast(
         self, county, metric, method, name, params=None, seed=None
@@ -141,7 +115,7 @@ class Forecaster:
         # Set-up params object - including fetching relevant params for that
         # metric, if provided as dict with different params for each metric
         params = params or {}
-        params = self.resolve_params(params, metric)
+        params = resolve_params(params, metric)
 
         # Filter historic data to specified county and metric, then just keep
         # "ds" and "y" col
@@ -152,7 +126,22 @@ class Forecaster:
         ]
 
         # Filter holidays to specified county
-        holidays = self.df_holidays[self.df_holidays["county"] == county]
+        holidays = params.pop("holidays", None)
+        if holidays is not None:
+            holidays = holidays[holidays["county"] == county]
+            if holidays.empty:
+                raise ValueError(
+                    f"No holiday data found for county: {county}"
+                )
+
+        # Filter additional regressors to specified county
+        regressors_data = None
+        if self.df_regressors is not None:
+            regressors_data = self.df_regressors[self.df_regressors["county"] == county]
+            if regressors_data.empty:
+                raise ValueError(
+                    f"No regressor data found for county: {county}"
+                )
 
         # Generate forecasts
         if method == "prophet":
@@ -161,14 +150,15 @@ class Forecaster:
             forecast = predict_prophet(
                 historic=historic,
                 holidays=holidays,
-                forecast_length=self.forecast_length,
+                horizon=self.horizon,
+                regressors_data=regressors_data,
                 **params,
             )
         elif method == "arima":
             forecast = predict_arima(
                 historic=historic,
                 holidays=holidays,
-                forecast_length=self.forecast_length,
+                horizon=self.horizon,
                 **params,
             )
         else:
@@ -180,54 +170,23 @@ class Forecaster:
         forecast.insert(2, "currency", metric)
         return forecast
 
-    def run(self, scenarios=None, *, name=None, method=None, params=None):
+    def run(self, scenarios, base_seed=0):
         """Generate forecasts for all metrics and counties.
-
-        Can run as single scenario:
-        >> forecaster.run(name="arima_current_version",
-                            method="arima",
-                            params={"order": (1, 1, 1), ...})
-
-        Or can run a list of multiple scenarios:
-        >> forecaster.run(scenarios=[{...}, {...}])
 
         Parameters
         ----------
         scenarios : list[dict]
-            List of dictionaries, where each dictionary has the keys "name",
-            "method" and "params".
-        name : str
-            Name for the scenario.
-        method : str
-            Method to use - either "arima" or "prophet".
-        params : dict
-            Parameters for that method.
+            List of dictionaries, where each dictionary has the keys "name"
+            (label), "method" (one of the supported methods), and "params"
+            (dictionary of named parameters for that method). For example,
+            {"name": "arima_baseline", "method": "arima",
+            "params": {"order": (1, 1, 1), ...} }.
+        base_seed : int
+            Base seed - when creating seeds, they are add to the base.
 
         """
-        # If scenarios is provided, shouldn't also provide name/method/params
-        if scenarios is not None:
-            if name or method or params:
-                raise ValueError(
-                    "Pass either 'scenarios' OR 'name/method/params', ",
-                    "not both.",
-                )
-            scenario_list = scenarios
-        # If scenarios is not provided, make sure have name + method
-        else:
-            if name is None or method is None:
-                raise ValueError(
-                    "When 'scenarios' is not provided, 'name' and 'method' ",
-                    "are required.",
-                )
-            scenario_list = [
-                {
-                    "name": name,
-                    "method": method,
-                    "params": params,
-                }
-            ]
         # Return an error if any names are duplicate or already in results
-        names = [scenario["name"] for scenario in scenario_list]
+        names = [scenario["name"] for scenario in scenarios]
         duplicates = [i for i, count in Counter(names).items() if count > 1]
         existing = set(names).intersection(self.results_dict.keys())
         if duplicates or existing:
@@ -238,12 +197,10 @@ class Forecaster:
             )
 
         pairs = list(self.unique_pairs.itertuples(index=False, name=None))
-        seeds = [i for i in range(len(pairs))]
+        seeds = [base_seed + i for i in range(len(pairs))]
 
         # Loop over scenarios
-        for scenario in scenario_list:
-            print(f"Running scenario: {scenario}")
-
+        for scenario in scenarios:
             # Ensemble if just a simple groupby operation so don't need to
             # use generate_forecast, which runs all paris in a loop
             if scenario["method"] == "ensemble":
@@ -307,3 +264,32 @@ class Forecaster:
 
         """
         return pd.concat(list(self.results_dict.values()), ignore_index=True)
+
+
+def resolve_params(params, metric):
+    """Resolve params for a specific metric.
+
+    Any parameter value can be given as a plain value (used for all
+    metrics) or as a dict keyed by metric name.
+
+    Parameters
+    ----------
+    params : dict
+        Parameters, where each value is either a plain value or a
+        dict mapping metric name to value.
+    metric : str
+        Metric to resolve params for.
+
+    Returns
+    -------
+    dict
+        Params with any per-metric dicts resolved to a single value.
+
+    """
+    resolved = {}
+    for key, value in params.items():
+        if isinstance(value, dict) and metric in value:
+            resolved[key] = value[metric]
+        else:
+            resolved[key] = value
+    return resolved

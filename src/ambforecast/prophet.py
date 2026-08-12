@@ -1,6 +1,6 @@
 """Forecasts using Meta's Prophet package."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 import logging
 from typing import Literal
 
@@ -9,8 +9,41 @@ import pandas as pd
 from prophet import Prophet
 
 
-@dataclass(frozen=True, kw_only=True)
-class ProphetRegressor:
+class CustomRepr:
+    """Provide a compact representation for dataclasses containing DataFrames.
+
+    DataFrames can be large, so their full contents are not included when an
+    instance is displayed. Instead, DataFrames are shown with their shape and
+    column names.
+    """
+
+    @staticmethod
+    def _format_value(value):
+        """Replace DataFrames with a short summary."""
+        if isinstance(value, pd.DataFrame):
+            return (
+                f"DataFrame(shape={value.shape}, "
+                f"columns={value.columns.tolist()!r})"
+            )
+        return value
+
+    def __repr__(self):
+        """Return a concise representation that summarises DataFrame fields."""
+        values = []
+        for field in fields(self):
+            value = getattr(self, field.name)
+            values.append(f"{field.name}={self._format_value(value)}")
+        return f"{type(self).__name__}({', '.join(values)})"
+
+    def __rich_repr__(self):
+        """Yield dataclass fields for Rich to display."""
+        for field in fields(self):
+            value = getattr(self, field.name)
+            yield field.name, self._format_value(value)
+
+
+@dataclass(frozen=True, kw_only=True, repr=False)
+class ProphetRegressor(CustomRepr):
     """Configuration and data for a single Prophet regressor.
 
     For full documentation on Prophet regressors see:
@@ -42,8 +75,8 @@ class ProphetRegressor:
     mode: Literal["additive", "multiplicative"] | None = None
 
 
-@dataclass(frozen=True, kw_only=True)
-class ProphetParams:
+@dataclass(frozen=True, kw_only=True, repr=False)
+class ProphetParams(CustomRepr):
     """Parameters for the Prophet forecast model.
 
     For full range of parameters see:
@@ -114,6 +147,44 @@ class ProphetParams:
     plot_components: bool = False
 
 
+def merge_regressor(data, regressor):
+    """Merge a regressor and check it covers required dates and area.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Data containing `ds` and `area` columns.
+    regressor : ProphetRegressor
+        Regressor configuration and data.
+
+    Returns
+    -------
+    data : pd.DataFrame
+        Data with the regressor column added.
+
+    """
+    data = pd.merge(
+        data,
+        regressor.data[["ds", "area", regressor.name]],
+        on=["ds", "area"],
+        how="left",
+        validate="one_to_one"
+    )
+
+    missing = data.loc[
+        data[regressor.name].isna(),
+        ["ds", "area"],
+    ]
+
+    if not missing.empty:
+        raise ValueError(
+            f"Regressor {regressor.name!r} has missing values for:\n"
+            f"{missing.to_string(index=False)}"
+        )
+
+    return data
+
+
 def prophet(train, params, test=None, horizon=None):
     """Fit Prophet model and generate forecast.
 
@@ -161,43 +232,33 @@ def prophet(train, params, test=None, horizon=None):
     )
 
     # Add regressor data to the training data and add them to the model
-    if params.regressors is not None:
-        for regressor in params.regressors:
-            train = pd.merge(
-                train,
-                regressor.data[["ds", regressor.name]],
-                on="ds",
-                how="left",
-                validate="one_to_one"
-            )
-            model.add_regressor(
-                name=regressor.name,
-                prior_scale=regressor.prior_scale,
-                standardize=regressor.standardize,
-                mode=regressor.mode
-            )
+    # Will only run loop if regressors are provided
+    for regressor in params.regressors:
+        train = merge_regressor(data=train, regressor=regressor)
+        model.add_regressor(
+            name=regressor.name,
+            prior_scale=regressor.prior_scale,
+            standardize=regressor.standardize,
+            mode=regressor.mode
+        )
 
     # Fit Prophet model using the training data
     model.fit(train)
 
     # Construct future dataframe based on horizon or on dates in test
+    # We set-up with "area" as any regressors will merge based on it.
     if test is None:
         future = model.make_future_dataframe(
             freq="D", periods=horizon, include_history=False
         )
+        future["area"] = train["area"].iloc[0]
     else:
-        future = pd.DataFrame(test["ds"])
+        future = test[["ds", "area"]].copy()
 
     # Add regressor data to the future dataframe
-    if params.regressors is not None:
-        for regressor in params.regressors:
-            future = pd.merge(
-                future,
-                regressor.data[["ds", regressor.name]],
-                on="ds",
-                how="left",
-                validate="one_to_one"
-            )
+    # Will only run loop if regressors are provided
+    for regressor in params.regressors:
+        future = merge_regressor(data=future, regressor=regressor)
 
     # Generate forecast
     forecast = model.predict(future)
@@ -216,4 +277,4 @@ def prophet(train, params, test=None, horizon=None):
         }
     )
 
-    return forecast
+    return forecast[["ds", "forecast", "pi_lower", "pi_upper"]]

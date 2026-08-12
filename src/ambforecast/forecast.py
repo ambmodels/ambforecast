@@ -8,6 +8,7 @@ from forecast_tools.metrics import (
     root_mean_squared_error,
     symmetric_mean_absolute_percentage_error,
 )
+from.splits import rolling_forecast_origin
 
 
 def unique_pairs(data):
@@ -151,6 +152,120 @@ def run_forecasts(
             for (metric, area) in pairs
         )
     return pd.concat(forecasts, ignore_index=True)
+
+
+def run_cross_validation(
+    forecast_function,
+    historic,
+    params,
+    horizon,
+    step,
+    min_train=365*2,
+    cores=1,
+):
+    """Run rolling forecast origin cross-validation.
+
+    Parameters
+    ----------
+    forecast_function : prophet | arima
+        Forecasting function to run.
+    historic : pd.DataFrame
+        Historic data used to create rolling training and test samples.
+    params : ProphetParams | ARIMAParams
+        Parameters for the selected forecasting model.
+    horizon : int
+        Number of daily observations in each test set.
+    step : int
+        How many days to move by before creating a new sample. Warning:
+        using a step of 365 will produce test samples all at approximately
+        the same time of year.
+    min_train : int
+        Minimum number of days to include in training sample. By default,
+        set to 2 years as that allows detection of yearly seasonality.
+    cores : int
+        Number of CPU cores to use. Set to 1 for sequential processing or -1
+        to use all available cores.
+
+    Returns
+    -------
+    forecasts, errors : tuple[pd.DataFrame, pd.DataFrame]
+        Forecasts contains results for every fold, metric, and area.
+        Errors contains accuracy measures for every fold, metric, and area.
+
+    """
+    # Create several sets of training and test data
+    train_folds, test_folds = rolling_forecast_origin(
+        data=historic,
+        horizon=horizon,
+        step=step,
+        min_train=min_train
+    )
+
+    # Find unique combinations of metric and area
+    pairs = unique_pairs(historic)
+
+    # Find all combinations of metric, area and fold to loop through
+    jobs = [
+        (fold, metric, area)
+        for fold in range(len(train_folds))
+        for metric, area in pairs
+    ]
+
+    # Fit models and generate forecasts, sequentially or in parallel
+    if cores == 1:
+        forecasts = [
+            run_single_forecast(
+                forecast_function=forecast_function,
+                train=train_folds[fold],
+                test=test_folds[fold],
+                params=params,
+                metric=metric,
+                area=area,
+            )
+            for fold, metric, area in jobs
+        ]
+    else:
+        forecasts = Parallel(n_jobs=cores, batch_size=1)(
+            delayed(run_single_forecast)(
+                forecast_function=forecast_function,
+                train=train_folds[fold],
+                test=test_folds[fold],
+                params=params,
+                metric=metric,
+                area=area,
+            )
+            for fold, metric, area in jobs
+        )
+
+    # Calculate forecast errors
+    errors = []
+
+    for forecast, (fold, metric, area) in zip(
+        forecasts,
+        jobs,
+        strict=True,
+    ):
+        forecast.insert(0, "fold", fold)
+
+        error = forecast_errors(
+            train=train_folds[fold],
+            test=test_folds[fold],
+            forecast=forecast,
+        )
+
+        errors.append(
+            {
+                "fold": fold,
+                "metric": metric,
+                "area": area,
+                **error,
+            }
+        )
+
+    forecasts = pd.concat(forecasts, ignore_index=True)
+    errors = pd.DataFrame(errors)
+
+    return forecasts, errors
 
 
 def forecast_errors(train, test, forecast):

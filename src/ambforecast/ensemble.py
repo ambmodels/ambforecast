@@ -15,6 +15,7 @@ def ensemble(forecasts):
     -------
     ensemble : pd.DataFrame
         Ensemble forecast.
+
     """
     metric = forecasts[0]["metric"].iloc[0]
     area = forecasts[0]["area"].iloc[0]

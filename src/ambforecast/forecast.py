@@ -1,14 +1,15 @@
 """Functions used to run forecasts."""
 
 import pandas as pd
-from joblib import Parallel, delayed
 from forecast_tools.metrics import (
     coverage,
     mean_absolute_scaled_error,
     root_mean_squared_error,
     symmetric_mean_absolute_percentage_error,
 )
-from.splits import rolling_forecast_origin
+from joblib import Parallel, delayed
+
+from .splits import rolling_forecast_origin
 
 
 def unique_pairs(data):
@@ -26,7 +27,8 @@ def unique_pairs(data):
 
     """
     return list(
-        data[["metric", "area"]].drop_duplicates()
+        data[["metric", "area"]]
+        .drop_duplicates()
         .reset_index(drop=True)
         .itertuples(index=False, name=None)
     )
@@ -79,10 +81,7 @@ def run_single_forecast(
         test_subset = None
 
     forecast = forecast_function(
-        train=train_subset,
-        params=params,
-        test=test_subset,
-        horizon=horizon
+        train=train_subset, params=params, test=test_subset, horizon=horizon
     )
 
     forecast.insert(1, "metric", metric)
@@ -134,7 +133,7 @@ def run_forecasts(
                 metric=metric,
                 area=area,
                 test=test,
-                horizon=horizon
+                horizon=horizon,
             )
             for (metric, area) in pairs
         ]
@@ -147,7 +146,7 @@ def run_forecasts(
                 metric=metric,
                 area=area,
                 test=test,
-                horizon=horizon
+                horizon=horizon,
             )
             for (metric, area) in pairs
         )
@@ -160,7 +159,7 @@ def run_cross_validation(
     params,
     horizon,
     step,
-    min_train=365*2,
+    min_train=365 * 2,
     cores=1,
 ):
     """Run rolling forecast origin cross-validation.
@@ -195,10 +194,7 @@ def run_cross_validation(
     """
     # Create several sets of training and test data
     train_folds, test_folds = rolling_forecast_origin(
-        data=historic,
-        horizon=horizon,
-        step=step,
-        min_train=min_train
+        data=historic, horizon=horizon, step=step, min_train=min_train
     )
 
     # Find unique combinations of metric and area
@@ -290,18 +286,13 @@ def forecast_errors(train, test, forecast):
     -------
     dict
         Dictionary of forecast accuracy measures.
+
     """
     # Filter training and test data to the metric and area in the forecast
     metric = forecast["metric"].iloc[0]
     area = forecast["area"].iloc[0]
-    train_subset = train[
-        (train["metric"] == metric)
-        & (train["area"] == area)
-    ]
-    test_subset = test[
-        (test["metric"] == metric)
-        & (test["area"] == area)
-    ]
+    train_subset = train[(train["metric"] == metric) & (train["area"] == area)]
+    test_subset = test[(test["metric"] == metric) & (test["area"] == area)]
 
     # Check that forecast and training data have same dates
     test_subset = test_subset.sort_values("ds").reset_index(drop=True)
@@ -312,20 +303,18 @@ def forecast_errors(train, test, forecast):
     # Calculate forecast accuracy measures
     return {
         "rmse": root_mean_squared_error(
-            y_true=test_subset["y"],
-            y_pred=forecast["forecast"]
+            y_true=test_subset["y"], y_pred=forecast["forecast"]
         ),
         "mase": mean_absolute_scaled_error(
             y_true=test_subset["y"],
             y_pred=forecast["forecast"],
-            y_train=train_subset["y"]
+            y_train=train_subset["y"],
         ),
         "smape": symmetric_mean_absolute_percentage_error(
-            y_true=test_subset["y"],
-            y_pred=forecast["forecast"]
+            y_true=test_subset["y"], y_pred=forecast["forecast"]
         ),
         "coverage": coverage(
             y_true=test_subset["y"],
-            pred_intervals=forecast[["pi_lower", "pi_upper"]].values.tolist()
-        )
+            pred_intervals=forecast[["pi_lower", "pi_upper"]].values.tolist(),
+        ),
     }

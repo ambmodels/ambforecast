@@ -14,7 +14,7 @@ def plot_forecast(
     test=None,
     historic_length=42,
     forecast_colour="tab:blue",
-    forecast_name="Forecast"
+    forecast_name="Forecast",
 ):
     """Plot historic data and forecast with 95% prediction intervals.
 
@@ -45,27 +45,24 @@ def plot_forecast(
 
     # Filter training data to relevant metric and area
     observed_plot = train[
-        (train["metric"] == metric)
-        & (train["area"] == area)
+        (train["metric"] == metric) & (train["area"] == area)
     ].copy()
 
     # Get the final X days specified of the training data
     date_min = forecast["ds"].min() - dt.timedelta(days=historic_length)
-    observed_plot = observed_plot[
-        observed_plot["ds"] >= date_min
-    ].sort_values("ds")
+    observed_plot = observed_plot[observed_plot["ds"] >= date_min].sort_values(
+        "ds"
+    )
 
     # If provided, also filter test data to relevant metric and area and
     # combine into the training dataframe
     if test is not None:
         test_plot = test[
-            (test["metric"] == metric)
-            & (test["area"] == area)
+            (test["metric"] == metric) & (test["area"] == area)
         ].sort_values("ds")
-        observed_plot = (
-            pd.concat([observed_plot, test_plot], ignore_index=True)
-            .sort_values("ds")
-        )
+        observed_plot = pd.concat(
+            [observed_plot, test_plot], ignore_index=True
+        ).sort_values("ds")
 
     # Ensure forecast is sorted by date
     forecast = forecast.sort_values("ds")
@@ -78,7 +75,7 @@ def plot_forecast(
         observed_plot["y"],
         color="black",
         label="Observed",
-        zorder=2
+        zorder=2,
     )
 
     # Forecast
@@ -87,7 +84,7 @@ def plot_forecast(
         forecast["forecast"],
         color=forecast_colour,
         label="Forecast",
-        zorder=3
+        zorder=3,
     )
     ax.fill_between(
         forecast["ds"].to_numpy(),
@@ -96,7 +93,7 @@ def plot_forecast(
         color=forecast_colour,
         alpha=0.2,
         label="95% Prediction Interval",
-        zorder=1
+        zorder=1,
     )
 
     # Vertical line marking start of the forecast
@@ -114,9 +111,7 @@ def plot_forecast(
 
     # X axis ticks for dates every 7 days from first date
     ticks = pd.date_range(
-        start=observed_plot["ds"].min(),
-        end=forecast["ds"].max(),
-        freq="7D"
+        start=observed_plot["ds"].min(), end=forecast["ds"].max(), freq="7D"
     )
     ax.xaxis.set_major_locator(mticker.FixedLocator(mdates.date2num(ticks)))
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%-d %b %y"))

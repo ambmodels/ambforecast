@@ -1,7 +1,7 @@
 """Forecasts using Meta's Prophet package."""
 
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 from typing import Literal
 
 import cmdstanpy
@@ -136,7 +136,7 @@ def merge_regressor(data, regressor):
         regressor.data[["ds", "area", regressor.name]],
         on=["ds", "area"],
         how="left",
-        validate="one_to_one"
+        validate="one_to_one",
     )
 
     missing = data.loc[
@@ -187,16 +187,16 @@ def prophet(train, params, test=None, horizon=None):
 
     # Set up Prophet model parameters
     model = Prophet(
-        holidays = params.holidays,
-        yearly_seasonality = params.yearly_seasonality,
-        weekly_seasonality = params.weekly_seasonality,
-        daily_seasonality = params.daily_seasonality,
-        seasonality_mode = params.seasonality_mode,
-        changepoint_range = params.changepoint_range,
-        changepoint_prior_scale = params.changepoint_prior_scale,
-        seasonality_prior_scale = params.seasonality_prior_scale,
-        holidays_prior_scale = params.holidays_prior_scale,
-        interval_width = params.interval_width
+        holidays=params.holidays,
+        yearly_seasonality=params.yearly_seasonality,
+        weekly_seasonality=params.weekly_seasonality,
+        daily_seasonality=params.daily_seasonality,
+        seasonality_mode=params.seasonality_mode,
+        changepoint_range=params.changepoint_range,
+        changepoint_prior_scale=params.changepoint_prior_scale,
+        seasonality_prior_scale=params.seasonality_prior_scale,
+        holidays_prior_scale=params.holidays_prior_scale,
+        interval_width=params.interval_width,
     )
 
     # Add regressor data to the training data and add them to the model
@@ -207,7 +207,7 @@ def prophet(train, params, test=None, horizon=None):
             name=regressor.name,
             prior_scale=regressor.prior_scale,
             standardize=regressor.standardize,
-            mode=regressor.mode
+            mode=regressor.mode,
         )
 
     # Fit Prophet model using the training data

@@ -3,7 +3,7 @@
 import datetime as dt
 
 
-def train_test_split(data, horizon, min_train=365*2, test_end=None):
+def train_test_split(data, horizon, min_train=365 * 2, test_end=None):
     """Create a single train/test split.
 
     Parameters
@@ -43,7 +43,7 @@ def train_test_split(data, horizon, min_train=365*2, test_end=None):
     return train, test
 
 
-def rolling_forecast_origin(data, horizon, step, min_train=365*2):
+def rolling_forecast_origin(data, horizon, step, min_train=365 * 2):
     """Create rolling forecast origin train/test samples.
 
     Samples are generated from the most recent data backwards. The test period

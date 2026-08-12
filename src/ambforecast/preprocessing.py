@@ -7,15 +7,15 @@ import pandas as pd
 # ----------------------------------------------------------------------------
 
 
-def prepare_historic(data, metrics=["Calls", "Responses", "Incidents"]):
+def prepare_historic(data, metrics=("Calls", "Responses", "Incidents")):
     """Prepare historic data.
 
     Parameters
     ----------
     data : pd.DataFrame
         Raw historic data.
-    metrics : list[str]
-        List of metrics to keep.
+    metrics : list[str] | tuple[str, ...]
+        Metrics to keep.
 
     Returns
     -------

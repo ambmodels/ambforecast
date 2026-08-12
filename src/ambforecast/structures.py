@@ -1,6 +1,7 @@
 """Structures used in code."""
 
 from dataclasses import fields
+
 import pandas as pd
 
 

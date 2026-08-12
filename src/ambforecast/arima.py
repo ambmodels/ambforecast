@@ -1,14 +1,15 @@
 """Forecasts using ARIMA."""
 
 import warnings
-
 from dataclasses import dataclass
-import pandas as pd
-from .structures import CustomRepr
 
+import pandas as pd
 import statsmodels.api as sm
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 from threadpoolctl import threadpool_limits
+
+from .structures import CustomRepr
+
 
 @dataclass(kw_only=True, repr=False)
 class ARIMAParams(CustomRepr):
@@ -108,8 +109,7 @@ def arima(train, params, test=None, horizon=None):
     # upper_window
     if params.holidays is not None:
         arima_holidays = encode_holidays(
-            dates=arima_train.index,
-            holiday_dates=params.holidays["ds"]
+            dates=arima_train.index, holiday_dates=params.holidays["ds"]
         )
     else:
         arima_holidays = None
@@ -121,7 +121,7 @@ def arima(train, params, test=None, horizon=None):
         order=params.order,
         seasonal_order=params.seasonal_order,
         enforce_stationarity=params.enforce_stationarity,
-        freq="D"
+        freq="D",
     )
 
     # threadpool_limits is required to ensure consistency on Linux when
@@ -142,22 +142,20 @@ def arima(train, params, test=None, horizon=None):
         forecast_dates = pd.date_range(
             start=arima_train.index.max() + pd.Timedelta(days=1),
             periods=horizon,
-            freq="D"
+            freq="D",
         )
 
     # Encode holidays for prediction dates
     if params.holidays is not None:
         forecast_holidays = encode_holidays(
-            dates=forecast_dates,
-            holiday_dates=params.holidays["ds"]
+            dates=forecast_dates, holiday_dates=params.holidays["ds"]
         )
     else:
         forecast_holidays = None
 
     # Get forecast for those dates and extract summary dataframe
     model_forecast = model.get_forecast(
-        steps=len(forecast_dates),
-        exog=forecast_holidays
+        steps=len(forecast_dates), exog=forecast_holidays
     )
     forecast = model_forecast.summary_frame(alpha=1 - params.interval_width)
 

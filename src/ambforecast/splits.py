@@ -32,7 +32,7 @@ def train_test_split(data, horizon, min_train=365*2, test_end=None):
 
     # Split into train and test dataset
     train = data[data["ds"] < test_start]
-    test = data[data["ds"] >= test_start]
+    test = data[(data["ds"] >= test_start) & (data["ds"] <= test_end)]
 
     if train["ds"].nunique() < min_train:
         raise ValueError(

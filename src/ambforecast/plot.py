@@ -9,75 +9,68 @@ import pandas as pd
 
 
 def plot_forecast(
-    df_historic,
+    train,
     forecast,
-    metric,
-    county,
-    name,
-    historic_length,
-    forecast_colour,
+    historic_length=42,
+    forecast_colour="tab:blue",
+    forecast_name="Forecast"
 ):
-    """Plot actual and forecast values with 95% prediction intervals.
+    """Plot historic data and forecast with 95% prediction intervals.
 
     Parameters
     ----------
-    df_historic : pd.DataFrame
-        Historic data.
+    train : pd.DataFrame
+        Historic data used to train the model.
     forecast : pd.DataFrame
         Forecast.
-    metric : str
-        Name of metric.
-    county : str
-        Name of county.
-    name : str
-        Name of the forecast to plot - corresponds to "name" column in the
-        forecast results dataframe.
     historic_length : int
-        Number of days of data to include from the historic data. For example,
-        to show 6 weeks of actual data before the forecast, set to 6*7.
+        Number of historic days to display before the forecast.
     forecast_colour : str
-        Forecast colour.
+        Colour for the forecast line and prediction interval.
+    forecast_name : str
+        Label to use for forecast in title of the plot.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        Forecast figure.
 
     """
+    metric = forecast["metric"].iloc[0]
+    area = forecast["area"].iloc[0]
+
+    train_plot = train[
+        (train["metric"] == metric)
+        & (train["area"] == area)
+    ].copy()
+
     # Get the final X days specified of the historic data
-    date_min = df_historic["ds"].max() - dt.timedelta(days=historic_length - 1)
-    historic_finaldays = df_historic[df_historic["ds"] >= date_min]
-    historic_plot = historic_finaldays.loc[
-        (historic_finaldays["currency"] == metric)
-        & (historic_finaldays["ora"] == county),
-        ["ds", "y"],
-    ]
+    date_min = forecast["ds"].min() - dt.timedelta(days=historic_length)
+    train_plot = train_plot[
+        train_plot["ds"] >= date_min
+    ].sort_values("ds")
 
-    # Filter to the relevant forecast
-    forecast_plot = forecast.loc[
-        (forecast["currency"] == metric)
-        & (forecast["county"] == county)
-        & (forecast["name"] == name),
-        ["ds", "forecast", "pi_lower", "pi_upper"],
-    ]
-
-    df = pd.concat([historic_plot, forecast_plot]).reset_index(drop=True)
+    forecast = forecast.sort_values("ds")
 
     fig, ax = plt.subplots(figsize=(12, 5))
 
-    ax.plot(df["ds"], df["y"], color="black", label="Actual")
-    ax.plot(df["ds"], df["forecast"], color=forecast_colour, label="Forecast")
+    ax.plot(train_plot["ds"], train_plot["y"], color="black", label="Observed")
+    ax.plot(forecast["ds"], forecast["forecast"], color=forecast_colour, label="Forecast")
     ax.fill_between(
-        df["ds"],
-        df["pi_lower"],
-        df["pi_upper"],
+        forecast["ds"].to_numpy(),
+        forecast["pi_lower"],
+        forecast["pi_upper"],
         color=forecast_colour,
         alpha=0.2,
         label="95% Prediction Interval",
     )
 
     # Vertical line marking start of the forecast
-    boundary = forecast_plot["ds"].min()
+    boundary = forecast["ds"].min()
     ax.axvline(boundary, color="red")
-    y_top = ax.get_ylim()[1]
     ax.annotate(
         "Forecast begins",
-        xy=(boundary, y_top),
+        xy=(boundary, ax.get_ylim()[1]),
         xytext=(5, -5),
         textcoords="offset points",
         va="top",
@@ -86,16 +79,19 @@ def plot_forecast(
     )
 
     # X axis ticks for dates every 7 days from first date
-    ticks = pd.date_range(start=df["ds"].min(), end=df["ds"].max(), freq="7D")
+    ticks = pd.date_range(
+        start=train_plot["ds"].min(),
+        end=forecast["ds"].max(),
+        freq="7D"
+    )
     ax.xaxis.set_major_locator(mticker.FixedLocator(mdates.date2num(ticks)))
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%-d %b %y"))
     fig.autofmt_xdate(rotation=45, ha="right")
 
     ax.set_ylim(ymin=0)
-
     ax.set_xlabel("Date")
     ax.set_ylabel(metric)
-    ax.set_title(f"{county} {metric} {name}")
+    ax.set_title(f"{area} {metric} {forecast_name}")
     ax.grid(alpha=0.3)
     ax.legend(loc="lower right")
 

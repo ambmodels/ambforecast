@@ -54,8 +54,10 @@ def run_single_forecast(
         Forecasting function to run.
     train : pd.DataFrame
         Historic data used to train the model.
-    params : ProphetParams | ARIMAParams
-        Parameters for the selected forecasting model.
+    params : ProphetParams | ARIMAParams | dict
+        Parameters for the selected forecasting model. Can be one parameter
+        object used for all metrics, or a dictionary mapping metric names to
+        parameter objects.
     metric : str
         Name of metric to forecast.
     area : str
@@ -73,6 +75,13 @@ def run_single_forecast(
         Forecast results.
 
     """
+    if isinstance(params, dict):
+        if metric not in params:
+            raise ValueError(
+                f"No parameters provided for metric: {metric!r}"
+            )
+        params = params[metric]
+
     train_subset = train[(train["metric"] == metric) & (train["area"] == area)]
 
     if test is not None:

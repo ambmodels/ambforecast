@@ -6,6 +6,9 @@ import pandas as pd
 def ensemble(forecasts):
     """Calculate the mean of multiple forecasts.
 
+    This function will work with the outputs of run_single_forecast() and
+    run_forecasts().
+
     Parameters
     ----------
     forecasts : list[pd.DataFrame]
@@ -17,31 +20,38 @@ def ensemble(forecasts):
         Ensemble forecast.
 
     """
-    metric = forecasts[0]["metric"].iloc[0]
-    area = forecasts[0]["area"].iloc[0]
-    dates = forecasts[0]["ds"]
+    keys = ["ds", "metric", "area"]
 
-    for forecast in forecasts:
-        if forecast["ds"].duplicated().any():
-            raise ValueError("Each forecast must have one row per date.")
-
-        if not (forecast["metric"] == metric).all():
-            raise ValueError("All forecasts must have the same metric.")
-
-        if not (forecast["area"] == area).all():
-            raise ValueError("All forecasts must have the same area.")
-
-        if not forecast["ds"].equals(dates):
-            raise ValueError("All forecasts must cover the same dates.")
-
-    # Combine into single dataframe
-    ensemble = (
-        pd.concat(forecasts)
-        .groupby("ds")
-        .agg({"forecast": "mean", "pi_lower": "mean", "pi_upper": "mean"})
-        .reset_index()
+    # Checking for issues before combining
+    reference = (
+        forecasts[0][keys]
+        .sort_values(keys)
+        .reset_index(drop=True)
     )
-    ensemble.insert(1, "metric", metric)
-    ensemble.insert(2, "area", area)
+    for forecast in forecasts:
+        if forecast.duplicated(keys).any():
+            raise ValueError(
+                "Each forecast must have one row per date, metric, and area."
+            )
+        forecast_keys = (
+            forecast[keys]
+            .sort_values(keys)
+            .reset_index(drop=True)
+        )
+        if not forecast_keys.equals(reference):
+            raise ValueError(
+                "All forecasts must cover the same dates, metrics, and areas."
+            )
 
-    return ensemble
+    return (
+        pd.concat(forecasts, ignore_index=True)
+        .groupby(keys, as_index=False)
+        .agg(
+            {
+                "forecast": "mean",
+                "pi_lower": "mean",
+                "pi_upper": "mean",
+            }
+        )
+        .sort_values(["ds", "metric", "area"])
+    )

@@ -12,6 +12,8 @@ def plot_forecast(
     train,
     forecast,
     test=None,
+    metric=None,
+    area=None,
     historic_length=42,
     forecast_colour="tab:blue",
     forecast_name="Forecast",
@@ -26,6 +28,14 @@ def plot_forecast(
         Forecast.
     test : pd.DataFrame | None
         Optional held-out observed data to display alongside the forecast.
+    metric : str | None
+        Metric to plot. Provide with `area` when `forecast` contains more
+        than one metric/area series. If None, the metric is taken from
+        `forecast`.
+    area : str | None
+        Area to plot. Provide with `metric` when `forecast` contains more
+        than one metric/area series. If None, the area is taken from
+        `forecast`.
     historic_length : int
         Number of historic days to display before the forecast.
     forecast_colour : str
@@ -39,9 +49,32 @@ def plot_forecast(
         Forecast figure.
 
     """
-    # Identify the relevant metric and area
-    metric = forecast["metric"].iloc[0]
-    area = forecast["area"].iloc[0]
+    if (metric is None) != (area is None):
+        raise ValueError("Provide both 'metric' and 'area', or neither.")
+
+    # If metric and area are not provided, forecast must contain one series.
+    if metric is None:
+        pairs = forecast[["metric", "area"]].drop_duplicates()
+
+        if len(pairs) != 1:
+            raise ValueError(
+                "Forecast contains multiple metric/area series. "
+                "Provide 'metric' and 'area'."
+            )
+
+        metric = pairs["metric"].iloc[0]
+        area = pairs["area"].iloc[0]
+
+    # Filter forecast in case it contains multiple metric/area series.
+    forecast_plot = forecast[
+        (forecast["metric"] == metric)
+        & (forecast["area"] == area)
+    ].sort_values("ds")
+
+    if forecast_plot.empty:
+        raise ValueError(
+            f"No forecast found for metric={metric!r}, area={area!r}."
+        )
 
     # Filter training data to relevant metric and area
     observed_plot = train[
@@ -49,7 +82,7 @@ def plot_forecast(
     ].copy()
 
     # Get the final X days specified of the training data
-    date_min = forecast["ds"].min() - dt.timedelta(days=historic_length)
+    date_min = forecast_plot["ds"].min() - dt.timedelta(days=historic_length)
     observed_plot = observed_plot[observed_plot["ds"] >= date_min].sort_values(
         "ds"
     )
@@ -64,8 +97,8 @@ def plot_forecast(
             [observed_plot, test_plot], ignore_index=True
         ).sort_values("ds")
 
-    # Ensure forecast is sorted by date
-    forecast = forecast.sort_values("ds")
+    # Ensure forecast_plot is sorted by date
+    forecast_plot = forecast_plot.sort_values("ds")
 
     fig, ax = plt.subplots(figsize=(12, 5))
 
@@ -80,16 +113,16 @@ def plot_forecast(
 
     # Forecast
     ax.plot(
-        forecast["ds"],
-        forecast["forecast"],
+        forecast_plot["ds"],
+        forecast_plot["forecast"],
         color=forecast_colour,
         label="Forecast",
         zorder=3,
     )
     ax.fill_between(
-        forecast["ds"].to_numpy(),
-        forecast["pi_lower"],
-        forecast["pi_upper"],
+        forecast_plot["ds"].to_numpy(),
+        forecast_plot["pi_lower"],
+        forecast_plot["pi_upper"],
         color=forecast_colour,
         alpha=0.2,
         label="95% Prediction Interval",
@@ -97,7 +130,7 @@ def plot_forecast(
     )
 
     # Vertical line marking start of the forecast
-    boundary = forecast["ds"].min()
+    boundary = forecast_plot["ds"].min()
     ax.axvline(boundary, color="red")
     ax.annotate(
         "Forecast begins",
@@ -111,7 +144,7 @@ def plot_forecast(
 
     # X axis ticks for dates every 7 days from first date
     ticks = pd.date_range(
-        start=observed_plot["ds"].min(), end=forecast["ds"].max(), freq="7D"
+        start=observed_plot["ds"].min(), end=forecast_plot["ds"].max(), freq="7D"
     )
     ax.xaxis.set_major_locator(mticker.FixedLocator(mdates.date2num(ticks)))
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%-d %b %y"))

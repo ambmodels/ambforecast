@@ -1,34 +1,37 @@
-"""Ensemble forecast."""
+"""Ensemble forecasts."""
+
+import pandas as pd
 
 
-def calculate_ensemble(forecast_results, names):
-    """Find the average forecast and intervals.
-
-    Using the provided table of forecasts, it will group and find the mean
-    forecast and pi_intervals for each county, currency (metric) and date.
+def ensemble(forecasts):
+    """Calculate the mean of multiple forecasts.
 
     Parameters
     ----------
-    forecast_results : pd.DataFrame
-        Dataframe of forecast results returned by Forecaster.results.
-    names : list[str]
-        List of forecasts to include in ensemble. These are the names in the
-        "name" column of the Forecaster.results dataframe.
+    forecasts : list[pd.DataFrame]
+        Forecast dataframes to combine.
 
+    Returns
+    -------
+    pd.DataFrame
+        Ensemble forecast.
     """
-    available_names = set(forecast_results["name"])
-    missing_names = [name for name in names if name not in available_names]
+    # Each dataframe in the list should be the result for a single model,
+    # metric and area
+    for forecast in forecasts:
+        if forecast["ds"].duplicated().any():
+            raise ValueError("Each forecast must have one row per date.")
 
-    if missing_names:
-        raise ValueError(
-            "For ensemble, all requested forecast names must be present in "
-            f'forecast_results["name"]. Missing: {missing_names}'
-        )
+    # The provided forecasts must all cover the same dates
+    dates = forecasts[0]["ds"]
+    for forecast in forecasts[1:]:
+        if not forecast["ds"].equals(dates):
+            raise ValueError("All forecasts must cover the same dates.")
 
-    df = forecast_results[forecast_results["name"].isin(names)]
-    ensemble = (
-        df.groupby(["county", "currency", "ds"])
+    # Combine into single dataframe
+    return (
+        pd.concat(forecasts)
+        .groupby("ds")
         .agg({"forecast": "mean", "pi_lower": "mean", "pi_upper": "mean"})
         .reset_index()
     )
-    return ensemble

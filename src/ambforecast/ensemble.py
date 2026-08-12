@@ -1,34 +1,47 @@
-"""Ensemble forecast."""
+"""Ensemble forecasts."""
+
+import pandas as pd
 
 
-def calculate_ensemble(forecast_results, names):
-    """Find the average forecast and intervals.
-
-    Using the provided table of forecasts, it will group and find the mean
-    forecast and pi_intervals for each county, currency (metric) and date.
+def ensemble(forecasts):
+    """Calculate the mean of multiple forecasts.
 
     Parameters
     ----------
-    forecast_results : pd.DataFrame
-        Dataframe of forecast results returned by Forecaster.results.
-    names : list[str]
-        List of forecasts to include in ensemble. These are the names in the
-        "name" column of the Forecaster.results dataframe.
+    forecasts : list[pd.DataFrame]
+        Forecast dataframes to combine.
+
+    Returns
+    -------
+    ensemble : pd.DataFrame
+        Ensemble forecast.
 
     """
-    available_names = set(forecast_results["name"])
-    missing_names = [name for name in names if name not in available_names]
+    metric = forecasts[0]["metric"].iloc[0]
+    area = forecasts[0]["area"].iloc[0]
+    dates = forecasts[0]["ds"]
 
-    if missing_names:
-        raise ValueError(
-            "For ensemble, all requested forecast names must be present in "
-            f'forecast_results["name"]. Missing: {missing_names}'
-        )
+    for forecast in forecasts:
+        if forecast["ds"].duplicated().any():
+            raise ValueError("Each forecast must have one row per date.")
 
-    df = forecast_results[forecast_results["name"].isin(names)]
+        if not (forecast["metric"] == metric).all():
+            raise ValueError("All forecasts must have the same metric.")
+
+        if not (forecast["area"] == area).all():
+            raise ValueError("All forecasts must have the same area.")
+
+        if not forecast["ds"].equals(dates):
+            raise ValueError("All forecasts must cover the same dates.")
+
+    # Combine into single dataframe
     ensemble = (
-        df.groupby(["county", "currency", "ds"])
+        pd.concat(forecasts)
+        .groupby("ds")
         .agg({"forecast": "mean", "pi_lower": "mean", "pi_upper": "mean"})
         .reset_index()
     )
+    ensemble.insert(1, "metric", metric)
+    ensemble.insert(2, "area", area)
+
     return ensemble

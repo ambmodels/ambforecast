@@ -1,18 +1,57 @@
-"""ARIMA forecast."""
+"""Forecasts using ARIMA."""
 
 import warnings
-from datetime import timedelta
+from dataclasses import dataclass
 
 import pandas as pd
 import statsmodels.api as sm
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 from threadpoolctl import threadpool_limits
 
+from .structures import CustomRepr
 
-def _encode_holidays(dates, holiday_dates):
+
+@dataclass(kw_only=True, repr=False)
+class ARIMAParams(CustomRepr):
+    """Parameters for the ARIMA forecast model.
+
+    Parameters
+    ----------
+    holidays : pd.DataFrame | None
+        Holiday dataframe. If None, no holiday effects are fitted.
+    order : tuple
+        The (p, d, q) order of the model.
+    seasonal_order : tuple
+        The (P, D, Q, s) order of the seasonal component of the model.
+    enforce_stationarity : bool
+        Whether or not to require the autoregressive parameters to correspond
+        to a stationarity process.
+    max_iter : int
+        The maximum number of iterations. Using ARIMA default (50), we did
+        observe a warning that "Maximum Likelihood optimisation failed to
+        converge". This warning can be resolved by increasing the maximum.
+    interval_width : float
+        Width of the prediction intervals - for example, 0.95 will produce
+        95% prediction intervals.
+
+    """
+
+    holidays: pd.DataFrame | None = None
+
+    # ARIMA default
+    order: tuple = (0, 0, 0)
+    # ARIMA default
+    seasonal_order: tuple = (0, 0, 0, 0)
+    # ARIMA default
+    enforce_stationarity: bool = True
+    # ARIMA default
+    max_iter: int = 50
+
+    interval_width: float = 0.95
+
+
+def encode_holidays(dates, holiday_dates):
     """Create dataframe with encoded holidays for ARIMA.
-
-    For each date, it is either marked as a holiday (1) or not (0).
 
     Parameters
     ----------
@@ -28,55 +67,28 @@ def _encode_holidays(dates, holiday_dates):
         whether each date was in holiday_dates or not.
 
     """
+    dates = pd.DatetimeIndex(dates)
     return pd.DataFrame(
         {"holiday": dates.isin(holiday_dates)}, index=dates
     ).astype(int)
 
 
-def predict_arima(
-    # Data and settings for the forecast
-    historic,
-    horizon,
-    holidays=None,
-    interval_width=0.95,
-    # ARIMA parameters
-    order=(0, 0, 0),
-    seasonal_order=(0, 0, 0, 0),
-    enforce_stationarity=True,
-    max_iter=50,
-):
-    """Predict future demand using ARIMA.
+def arima(train, params, test=None, horizon=None):
+    """Fit ARIMA model and generate forecast.
 
     Parameters
     ----------
-    historic : pd.DataFrame
-        DataFrame which must include two columns: "ds" (date) and
-        "y" (value). This should have been filtered to the relevant metric
-        and county.
-    horizon : int
-        Number of days into future that the data is predicted.
-    holidays : pd.DataFrame
-        DataFrame which must include two columns: "ds" (date) and "holiday"
-        (name of holiday). This should have been filtered to the relevant
-        county.
-    interval_width : float
-        Width of the prediction intervals - for example, 0.95 will produce
-        95% prediction intervals.
-    order : tuple
-        The (p, d, q) order of the model. If none specified, will use the
-        ARIMA default (0, 0, 0).
-    seasonal_order : tuple
-        The (P, D, Q, s) order of the seasonal component of the model. If
-        none specified, will use the ARIMA default (0, 0, 0, 0).
-    enforce_stationarity : bool
-        Whether or not to require the autoregressive parameters to correspond
-        to a stationarity process. If none specified, will use the ARIMA
-        default (True).
-    max_iter: int
-        The maximum number of iterations. If none specified, will use the
-        ARIMA default (50) - although we did find this produced a warning that
-        "Maximum Likelihood optimisation failed to converge". This warning can
-        be resolved by increasing the maximum.
+    train : pd.DataFrame
+        Historic training data.
+    params : ARIMAParams
+        Parameters controlling the ARIMA model.
+    test : pd.DataFrame | None
+        Data containing the dates to forecast in a `ds` column. Typically
+        a held-out test set or cross-validation fold.
+    horizon : int | None
+        Number of days to forecast, after the final date in `train`. To be
+        used if there is no test set (e.g., if actually predicting into future
+        with no data to compare against).
 
     Returns
     -------
@@ -84,25 +96,31 @@ def predict_arima(
         Forecast dataframe.
 
     """
-    # Set the dates as the index
-    arima_historic = historic.set_index("ds")
-    arima_historic.index.freq = "D"
+    if (test is None) == (horizon is None):
+        raise ValueError("Provide exactly one of 'test' or 'horizon'.")
 
-    # Create dataframe where index is each date from historic and column is
-    # "holiday" which is 1 when the date is listed as a holiday or 0
-    # otherwise. This just uses the date - it doesn't use lower_window and
+    # ARIMA requires an array - so set date as index and just extract y values
+    arima_train = train.set_index("ds")["y"]
+    arima_train.index.freq = "D"
+
+    # Create dataframe where index is each date from the training data and
+    # column is "holiday" which is 1 when the date is listed as a holiday and
+    # 0 otherwise. This just uses the date - it doesn't use lower_window and
     # upper_window
-    holiday_dummy = _encode_holidays(
-        dates=arima_historic.index, holiday_dates=holidays["ds"]
-    )
+    if params.holidays is not None:
+        arima_holidays = encode_holidays(
+            dates=arima_train.index, holiday_dates=params.holidays["ds"]
+        )
+    else:
+        arima_holidays = None
 
     # Fit ARIMA model
     model = sm.tsa.arima.ARIMA(
-        endog=arima_historic,
-        exog=holiday_dummy,
-        order=order,
-        seasonal_order=seasonal_order,
-        enforce_stationarity=enforce_stationarity,
+        endog=arima_train,
+        exog=arima_holidays,
+        order=params.order,
+        seasonal_order=params.seasonal_order,
+        enforce_stationarity=params.enforce_stationarity,
         freq="D",
     )
 
@@ -115,22 +133,31 @@ def predict_arima(
     # to use just one thread keeps things running the same way every time.
     with threadpool_limits(limits=1), warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=ConvergenceWarning)
-        model = model.fit(method_kwargs={"maxiter": max_iter})
+        model = model.fit(method_kwargs={"maxiter": params.max_iter})
 
     # Create index of dates to make prediction for
-    prediction_dates = pd.date_range(
-        start=arima_historic.index[-1] + timedelta(days=1),
-        periods=horizon,
-    )
+    if test is not None:
+        forecast_dates = test["ds"].reset_index(drop=True)
+    else:
+        forecast_dates = pd.date_range(
+            start=arima_train.index.max() + pd.Timedelta(days=1),
+            periods=horizon,
+            freq="D",
+        )
 
     # Encode holidays for prediction dates
-    holiday_dummy = _encode_holidays(
-        dates=prediction_dates, holiday_dates=holidays["ds"]
-    )
+    if params.holidays is not None:
+        forecast_holidays = encode_holidays(
+            dates=forecast_dates, holiday_dates=params.holidays["ds"]
+        )
+    else:
+        forecast_holidays = None
 
     # Get forecast for those dates and extract summary dataframe
-    model_forecast = model.get_forecast(horizon, exog=holiday_dummy)
-    forecast = model_forecast.summary_frame(alpha=1 - interval_width)
+    model_forecast = model.get_forecast(
+        steps=len(forecast_dates), exog=forecast_holidays
+    )
+    forecast = model_forecast.summary_frame(alpha=1 - params.interval_width)
 
     # Rearranging/relabelling forecast dataframe
     # statsmodels ARIMA labels these as confidence intervals, but they are

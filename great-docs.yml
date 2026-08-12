@@ -81,17 +81,55 @@ content_style: sky
 # - Use 'members: false' to exclude methods from documentation
 # - Add 'desc:' to sections for descriptions
 reference:
-  - title: Forecasting methods
+  - title: Data preparation
+    desc: Prepare and validate historic, holiday, and temperature data.
     contents:
-      - prophet.predict_prophet
-      - arima.predict_arima
-      - ensemble.calculate_ensemble
+      - preprocessing.prepare_historic
+      - preprocessing.validate_historic
+      - preprocessing.prepare_holidays
+      - preprocessing.validate_holidays
+      - preprocessing.prepare_temp
+      - preprocessing.interpolate_temp
+      - preprocessing.validate_temp
 
-  - title: Run forecast
+  - title: Data splitting
+    desc: Create train/test splits and rolling forecast origin samples.
     contents:
-      - forecast.Forecaster
+      - splits.train_test_split
+      - splits.rolling_forecast_origin
 
-  - title: Analysing results
+  - title: ARIMA
+    desc: Configure and run ARIMA forecasts.
+    contents:
+      - arima.ARIMAParams
+      - arima.arima
+
+  - title: Prophet
+    desc: Configure and run Prophet forecasts.
+    contents:
+      - prophet.ProphetRegressor
+      - prophet.ProphetParams
+      - prophet.prophet
+
+  - title: Running forecasts
+    desc: Run individual, multi-area/metric, and cross-validation forecasts.
+    contents:
+      - forecast.run_single_forecast
+      - forecast.run_forecasts
+      - forecast.run_cross_validation
+
+  - title: Ensembles
+    desc: Combine forecasts.
+    contents:
+      - ensemble.ensemble
+
+  - title: Forecast evaluation
+    desc: Calculate forecast accuracy measures.
+    contents:
+      - forecast.forecast_errors
+
+  - title: Plotting
+    desc: Visualise results.
     contents:
       - plot.plot_forecast
 

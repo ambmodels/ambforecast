@@ -1,6 +1,6 @@
 """Forecasts using Meta's Prophet package."""
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 import logging
 from typing import Literal
 
@@ -8,41 +8,10 @@ import cmdstanpy
 import pandas as pd
 from prophet import Prophet
 
-
-class CustomRepr:
-    """Provide a compact representation for dataclasses containing DataFrames.
-
-    DataFrames can be large, so their full contents are not included when an
-    instance is displayed. Instead, DataFrames are shown with their shape and
-    column names.
-    """
-
-    @staticmethod
-    def _format_value(value):
-        """Replace DataFrames with a short summary."""
-        if isinstance(value, pd.DataFrame):
-            return (
-                f"DataFrame(shape={value.shape}, "
-                f"columns={value.columns.tolist()!r})"
-            )
-        return value
-
-    def __repr__(self):
-        """Return a concise representation that summarises DataFrame fields."""
-        values = []
-        for field in fields(self):
-            value = getattr(self, field.name)
-            values.append(f"{field.name}={self._format_value(value)}")
-        return f"{type(self).__name__}({', '.join(values)})"
-
-    def __rich_repr__(self):
-        """Yield dataclass fields for Rich to display."""
-        for field in fields(self):
-            value = getattr(self, field.name)
-            yield field.name, self._format_value(value)
+from .structures import CustomRepr
 
 
-@dataclass(frozen=True, kw_only=True, repr=False)
+@dataclass(kw_only=True, repr=False)
 class ProphetRegressor(CustomRepr):
     """Configuration and data for a single Prophet regressor.
 
@@ -75,7 +44,7 @@ class ProphetRegressor(CustomRepr):
     mode: Literal["additive", "multiplicative"] | None = None
 
 
-@dataclass(frozen=True, kw_only=True, repr=False)
+@dataclass(kw_only=True, repr=False)
 class ProphetParams(CustomRepr):
     """Parameters for the Prophet forecast model.
 
@@ -85,8 +54,7 @@ class ProphetParams(CustomRepr):
     Parameters
     ----------
     holidays : pd.DataFrame | None
-        Holiday dataframe in Prophet format. If None, no holiday effects are
-        fitted.
+        Holiday dataframe. If None, no holiday effects are fitted.
     yearly_seasonality : bool | int | {"auto"}
         Whether to fit yearly seasonality, which is a repeating pattern across
         a calendar year (e.g., peaks in certain seasons).

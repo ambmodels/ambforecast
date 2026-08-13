@@ -53,11 +53,11 @@ def run_single_forecast(
 
     Parameters
     ----------
-    forecast_function : prophet | arima
+    forecast_function : prophet | arima | snaive
         Forecasting function to run.
     train : pd.DataFrame
         Historic data used to train the model.
-    params : ProphetParams | ARIMAParams | dict
+    params : ProphetParams | ARIMAParams | SNaiveParams | dict
         Parameters for the selected forecasting model. Can be one parameter
         object used for all metrics, or a dictionary mapping metric names to
         parameter objects.

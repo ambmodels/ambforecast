@@ -6,6 +6,7 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import pandas as pd
+import warnings
 
 DEFAULT_COLOURS = {
     "Calls": "tab:blue",
@@ -207,6 +208,13 @@ def plot_cross_validation(
         Forecast figure.
 
     """
+    # Check for any gaps in dates
+    dates = forecast["ds"].sort_values().unique()
+    gaps = pd.date_range(start=dates.min(), end=dates.max()).difference(dates)
+    if len(gaps) > 0:
+        warnings.warn("Uses continuous line but there are gaps in forecast.")
+
+    # Filter to relevant metric and area
     historic_plot = historic[
         (historic["metric"] == metric) & (historic["area"] == area)
     ].sort_values("ds")
@@ -214,6 +222,7 @@ def plot_cross_validation(
         (forecast["metric"] == metric) & (forecast["area"] == area)
     ].sort_values("ds")
 
+    # Filter to specified start date and/or end date
     if start_date is not None:
         historic_plot = historic_plot[historic_plot["ds"] >= start_date]
         forecast_plot = forecast_plot[forecast_plot["ds"] >= start_date]
@@ -221,6 +230,7 @@ def plot_cross_validation(
         historic_plot = historic_plot[historic_plot["ds"] <= end_date]
         forecast_plot = forecast_plot[forecast_plot["ds"] <= end_date]
 
+    # If no colour provided, use default based on metric
     if forecast_colour is None:
         forecast_colour = DEFAULT_COLOURS.get(metric, "tab:red")
 
@@ -273,7 +283,6 @@ def plot_cross_validation(
         )
 
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %Y"))
-    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
     fig.autofmt_xdate()
 
     ax.set_xlabel("Date")
@@ -282,3 +291,61 @@ def plot_cross_validation(
     ax.legend()
 
     fig.tight_layout()
+
+
+def plot_observed_against_forecast(historic, forecast, metric, area):
+    """Scatter plot of observed values against forecast values.
+
+    Parameters
+    ----------
+    historic : pd.DataFrame
+        Historic data.
+    forecast : pd.DataFrame
+        Forecast results.
+    metric : str
+        Name of metric.
+    area : str
+        Name of area.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        Scatter plot.
+    """
+    # Filter to relevant metric and area
+    historic_plot = historic[
+        (historic["metric"] == metric) & (historic["area"] == area)
+    ]
+    forecast_plot = forecast[
+        (forecast["metric"] == metric) & (forecast["area"] == area)
+    ]
+
+    # Merge into single dataframe matched on date
+    data = pd.merge(
+        forecast_plot[["ds", "forecast"]],
+        historic_plot[["ds", "y"]],
+        how="left",
+        on="ds",
+        validate="one_to_one"
+    )
+
+    fig, ax = plt.subplots(figsize=(5, 5))
+
+    axis_min = data[["y", "forecast"]].min().min()
+    axis_max = data[["y", "forecast"]].max().max()
+
+    # Scatter plot
+    ax.scatter(data["y"], data["forecast"], alpha=0.5, s=25)
+
+    # Diagonal line
+    ax.axline((axis_min, axis_min), slope=1, ls="--")
+
+    ax.set_xlabel("Observed")
+    ax.set_ylabel("Forecast")
+    ax.set_title(f"{metric} - {area}")
+
+    # Square equal axises and dimensions
+    padding = 0.05 * (axis_max - axis_min)
+    ax.set_xlim(axis_min - padding, axis_max + padding)
+    ax.set_ylim(axis_min - padding, axis_max + padding)
+    ax.set_aspect("equal", adjustable="box")

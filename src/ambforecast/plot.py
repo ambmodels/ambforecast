@@ -1,12 +1,12 @@
 """Plotting functions."""
 
 import datetime as dt
+import warnings
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import pandas as pd
-import warnings
 
 DEFAULT_COLOURS = {
     "Calls": "tab:blue",
@@ -212,7 +212,11 @@ def plot_cross_validation(
     dates = forecast["ds"].sort_values().unique()
     gaps = pd.date_range(start=dates.min(), end=dates.max()).difference(dates)
     if len(gaps) > 0:
-        warnings.warn("Uses continuous line but there are gaps in forecast.")
+        warnings.warn(
+            "Uses continuous line but there are gaps in forecast.",
+            category=UserWarning,
+            stacklevel=1,
+        )
 
     # Filter to relevant metric and area
     historic_plot = historic[
@@ -311,6 +315,7 @@ def plot_observed_against_forecast(historic, forecast, metric, area):
     -------
     matplotlib.figure.Figure
         Scatter plot.
+
     """
     # Filter to relevant metric and area
     historic_plot = historic[
@@ -326,7 +331,7 @@ def plot_observed_against_forecast(historic, forecast, metric, area):
         historic_plot[["ds", "y"]],
         how="left",
         on="ds",
-        validate="one_to_one"
+        validate="one_to_one",
     )
 
     fig, ax = plt.subplots(figsize=(5, 5))

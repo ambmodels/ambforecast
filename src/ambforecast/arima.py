@@ -13,7 +13,7 @@ from .structures import CustomRepr
 
 @dataclass(kw_only=True, repr=False)
 class ARIMAParams(CustomRepr):
-    """Parameters for the ARIMA forecast model.
+    """Parameters for the ARIMA model.
 
     Parameters
     ----------
@@ -81,7 +81,7 @@ def arima(train, params, test=None, horizon=None):
     train : pd.DataFrame
         Historic training data.
     params : ARIMAParams
-        Parameters controlling the ARIMA model.
+        Parameters controlling the model.
     test : pd.DataFrame | None
         Data containing the dates to forecast in a `ds` column. Typically
         a held-out test set or cross-validation fold.

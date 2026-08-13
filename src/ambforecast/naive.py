@@ -35,7 +35,7 @@ def snaive(train, params, test=None, horizon=None):
     train : pd.DataFrame
         Historic training data.
     params : SNaiveParams
-        Parameters controlling the SNaive model.
+        Parameters controlling the model.
     test : pd.DataFrame | None
         Data containing the dates to forecast in a `ds` column. Typically
         a held-out test set or cross-validation fold.

@@ -23,21 +23,13 @@ def ensemble(forecasts):
     keys = ["ds", "metric", "area"]
 
     # Checking for issues before combining
-    reference = (
-        forecasts[0][keys]
-        .sort_values(keys)
-        .reset_index(drop=True)
-    )
+    reference = forecasts[0][keys].sort_values(keys).reset_index(drop=True)
     for forecast in forecasts:
         if forecast.duplicated(keys).any():
             raise ValueError(
                 "Each forecast must have one row per date, metric, and area."
             )
-        forecast_keys = (
-            forecast[keys]
-            .sort_values(keys)
-            .reset_index(drop=True)
-        )
+        forecast_keys = forecast[keys].sort_values(keys).reset_index(drop=True)
         if not forecast_keys.equals(reference):
             raise ValueError(
                 "All forecasts must cover the same dates, metrics, and areas."

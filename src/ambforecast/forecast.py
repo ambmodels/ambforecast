@@ -1,5 +1,7 @@
 """Functions used to run forecasts."""
 
+from time import perf_counter
+
 import pandas as pd
 from forecast_tools.metrics import (
     coverage,
@@ -7,7 +9,8 @@ from forecast_tools.metrics import (
     root_mean_squared_error,
     symmetric_mean_absolute_percentage_error,
 )
-from joblib import Parallel, delayed
+from joblib import Parallel, delayed, effective_n_jobs
+from tqdm.auto import tqdm
 
 from .splits import rolling_forecast_origin
 
@@ -50,12 +53,14 @@ def run_single_forecast(
 
     Parameters
     ----------
-    forecast_function : prophet | arima
+    forecast_function : prophet | arima | snaive
         Forecasting function to run.
     train : pd.DataFrame
         Historic data used to train the model.
-    params : ProphetParams | ARIMAParams
-        Parameters for the selected forecasting model.
+    params : ProphetParams | ARIMAParams | SNaiveParams | dict
+        Parameters for the selected forecasting model. Can be one parameter
+        object used for all metrics, or a dictionary mapping metric names to
+        parameter objects.
     metric : str
         Name of metric to forecast.
     area : str
@@ -73,6 +78,11 @@ def run_single_forecast(
         Forecast results.
 
     """
+    if isinstance(params, dict):
+        if metric not in params:
+            raise ValueError(f"No parameters provided for metric: {metric!r}")
+        params = params[metric]
+
     train_subset = train[(train["metric"] == metric) & (train["area"] == area)]
 
     if test is not None:
@@ -164,6 +174,11 @@ def run_cross_validation(
 ):
     """Run rolling forecast origin cross-validation.
 
+    This can take some time because it fits a separate forecasting model for
+    every combination of fold, metric, and area. Progress is displayed with
+    `tqdm`, including the number of completed forecasts. The function also
+    prints the number of worker processes used and the total run time.
+
     Parameters
     ----------
     forecast_function : prophet | arima
@@ -192,6 +207,8 @@ def run_cross_validation(
         Errors contains accuracy measures for every fold, metric, and area.
 
     """
+    start_time = perf_counter()
+
     # Create several sets of training and test data
     train_folds, test_folds = rolling_forecast_origin(
         data=historic, horizon=horizon, step=step, min_train=min_train
@@ -207,6 +224,12 @@ def run_cross_validation(
         for metric, area in pairs
     ]
 
+    workers = effective_n_jobs(cores)
+    print(
+        f"Running {len(pairs)} series across {len(train_folds)} folds "
+        f"({len(jobs)} forecasts) using {workers} worker(s)."
+    )
+
     # Fit models and generate forecasts, sequentially or in parallel
     if cores == 1:
         forecasts = [
@@ -218,10 +241,17 @@ def run_cross_validation(
                 metric=metric,
                 area=area,
             )
-            for fold, metric, area in jobs
+            for fold, metric, area in tqdm(
+                jobs,
+                desc="Running forecasts",
+                unit="forecast",
+            )
         ]
     else:
-        forecasts = Parallel(n_jobs=cores, batch_size=1)(
+        forecast_generator = Parallel(
+            n_jobs=cores,
+            return_as="generator",
+        )(
             delayed(run_single_forecast)(
                 forecast_function=forecast_function,
                 train=train_folds[fold],
@@ -232,14 +262,23 @@ def run_cross_validation(
             )
             for fold, metric, area in jobs
         )
+        forecasts = list(
+            tqdm(
+                forecast_generator,
+                total=len(jobs),
+                desc="Running forecasts",
+                unit="forecast",
+            )
+        )
 
     # Calculate forecast errors
     errors = []
 
-    for forecast, (fold, metric, area) in zip(
-        forecasts,
-        jobs,
-        strict=True,
+    for forecast, (fold, metric, area) in tqdm(
+        zip(forecasts, jobs, strict=True),
+        total=len(jobs),
+        desc="Calculating errors",
+        unit="forecast",
     ):
         forecast.insert(0, "fold", fold)
 
@@ -260,6 +299,13 @@ def run_cross_validation(
 
     forecasts = pd.concat(forecasts, ignore_index=True)
     errors = pd.DataFrame(errors)
+
+    elapsed_seconds = round(perf_counter() - start_time)
+    minutes, seconds = divmod(elapsed_seconds, 60)
+    print(
+        "Cross-validation completed in "
+        f"{minutes} minute(s) and {seconds} second(s)."
+    )
 
     return forecasts, errors
 

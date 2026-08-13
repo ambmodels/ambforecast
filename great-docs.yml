@@ -9,14 +9,14 @@ authors:
     orcid: 0000-0002-6596-3479
     affiliation: University of Exeter
     github: amyheather
-  - name: Lee Coulson
-    affiliation: South Western Ambulance Service NHS Foundation Trust
-  - name: Irene Irungu
-    affiliation: South Western Ambulance Service NHS Foundation Trust
   - name: Thomas Monks
     orcid: 0000-0003-2631-4481
     affiliation: University of Exeter
     github: TomMonks
+  - name: Lee Coulson
+    affiliation: South Western Ambulance Service NHS Foundation Trust
+  - name: Irene Irungu
+    affiliation: South Western Ambulance Service NHS Foundation Trust
 
 # Docstring Parser
 # ----------------
@@ -91,6 +91,7 @@ reference:
       - preprocessing.prepare_temp
       - preprocessing.interpolate_temp
       - preprocessing.validate_temp
+      - preprocessing.convert_historic_to_weekly
 
   - title: Data splitting
     desc: Create train/test splits and rolling forecast origin samples.
@@ -110,6 +111,12 @@ reference:
       - prophet.ProphetRegressor
       - prophet.ProphetParams
       - prophet.prophet
+
+  - title: Naive benchmark
+    desc: Configure and run Seasonal Naive forecasts.
+    contents:
+      - naive.SNaiveParams
+      - naive.snaive
 
   - title: Running forecasts
     desc: Run individual, multi-area/metric, and cross-validation forecasts.
@@ -132,6 +139,8 @@ reference:
     desc: Visualise results.
     contents:
       - plot.plot_forecast
+      - plot.plot_cross_validation
+      - plot.plot_observed_against_forecast
 
 # Site URL
 # --------

@@ -46,7 +46,7 @@ class ProphetRegressor(CustomRepr):
 
 @dataclass(kw_only=True, repr=False)
 class ProphetParams(CustomRepr):
-    """Parameters for the Prophet forecast model.
+    """Parameters for the Prophet model.
 
     For full range of parameters see:
     https://facebook.github.io/prophet/api/prophet.html
@@ -161,7 +161,7 @@ def prophet(train, params, test=None, horizon=None):
     train : pd.DataFrame
         Historic training data.
     params : ProphetParams
-        Parameters controlling the Prophet model.
+        Parameters controlling the model.
     test : pd.DataFrame | None
         Data containing the dates to forecast in a `ds` column. Typically
         a held-out test set or cross-validation fold.

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 import cmdstanpy
+import numpy as np
 import pandas as pd
 from prophet import Prophet
 
@@ -153,7 +154,7 @@ def merge_regressor(data, regressor):
     return data
 
 
-def prophet(train, params, test=None, horizon=None):
+def prophet(train, params, test=None, horizon=None, seed=None):
     """Fit Prophet model and generate forecast.
 
     Parameters
@@ -169,6 +170,9 @@ def prophet(train, params, test=None, horizon=None):
         Number of days to forecast, after the final date in `train`. To be
         used if there is no test set (e.g., if actually predicting into future
         with no data to compare against).
+    seed : int | None
+        Random seed (as randomness is used by prophet when estimating the
+        prediction intervals, so a seed is needed to make them reproducible).
 
     Returns
     -------
@@ -178,6 +182,9 @@ def prophet(train, params, test=None, horizon=None):
     """
     if (test is None) == (horizon is None):
         raise ValueError("Provide exactly one of 'test' or 'horizon'.")
+
+    if seed is not None:
+        np.random.seed(seed)
 
     # Disable "start/done processing" from prophet
     # Have to do within predict_prophet() rather than in notebook so that

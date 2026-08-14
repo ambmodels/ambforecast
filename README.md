@@ -89,16 +89,6 @@ pytest
 
 See `CITATION.cff`.
 
-## Acknowledgements
-
-This work is part of the [STARS project](https://pythonhealthdatascience.github.io/stars/), supported by the Medical Research Council [grant number MR/Z503915/1] 
-
-This repository builds on the work reported in:
-
-> Monks, T., Harper, A., Allen, M. et al. Forecasting the daily demand for emergency medical ambulances in England and Wales: a benchmark model and external validation. BMC Med Inform Decis Mak 23, 117 (2023). https://doi.org/10.1186/s12911-023-02218-z.
-
-The GitHub repositories from that publication are <https://github.com/TomMonks/swast-benchmarking> and <https://github.com/TomMonks/swast-forecast-tool>.
-
 ## Contributors ✨
 
 TODO: Add Lee and Irene once receive GitHub usernames.
@@ -124,3 +114,36 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
 This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
+
+## Acknowledgements
+
+This work is part of the [STARS project](https://pythonhealthdatascience.github.io/stars/), supported by the Medical Research Council [grant number MR/Z503915/1] 
+
+This repository builds on the work reported in:
+
+> Monks, T., Harper, A., Allen, M. et al. Forecasting the daily demand for emergency medical ambulances in England and Wales: a benchmark model and external validation. BMC Med Inform Decis Mak 23, 117 (2023). https://doi.org/10.1186/s12911-023-02218-z.
+
+The GitHub repositories from that publication are <https://github.com/TomMonks/swast-benchmarking> and <https://github.com/TomMonks/swast-forecast-tool>.
+
+<br>
+
+```
+              ▓▓▓▓▓░░░░░░░░░░░░░▒▒▒▒▒▒░░░░░░░░░░░▒▓▓▓▒░▒▓▓▓▓▒                                       
+              ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░▒▓▓▓▓▒░░                                     
+              ░░░░░░░░░░░▒██████████████░░░░░░░░░░░░░░░▒▓▓▓▓▒░░░░░░░                                
+              ░░░░░░░░░░░▒██████████████░░░░░░▒▓▓░░░░░░▒▓▓▒░██████████                              
+              ░░░░░░░░░░░▒██████████████░░░░▒▓▒░░▒▓░░░░▒▓▓▒░███▓▓▓▓█████                            
+              ░░░░░░░░░░░▒██████████████░░░░░░▒▓▓░░░░░░▒▓▓▒░███▓▓▓▓██▓▓▓███                         
+              ░░░░░░░░░░░▒██████████████░░░░░░░░░░░░░░░▒▓▓▒░███▓▓▓▓██▓▓▓▓▓███                       
+              ░░░░░░░░░░░▒██████████████░░░░░░░░░░░░░░░▒▓▓▒░███▓▓▓▓██▓▓▓▓▓▓▓███                     
+              ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░▒▓▓▒░██████████████████▓░░                   
+              ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░▒▓▓▒░░░░░░░░░░░░░░░░░░░░░░░░░                
+              ▓▓▓▓▓▓▓▓▓▓▓▓▒░░░░░░░░░░▒▓▓▓▓▓▓▓▓▓▓▓░░░░░░▒▓▓░░▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░▒▒▒              
+              ▓▓▓▓▓▓▓▓▓▓▓▓▒░░░░░░░░░░▒▓▓▓▓▓▓▓▓▓▓▓░░░░░░▒▓▓░░▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░▒▒▒              
+              ░░░░░░░░░░░░▒▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░▓▓▓▓▓▓▓▓▓▓▓▒▒▒              
+              ░░░░░░░░░░░░▒▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓              
+                ░░░░░░░░░░░░░░▒████▒░░░░░░░░░░░░░░░░░░░▒▓▓░░░░░░░░░░░▓▓▓▓██████▓▓▓▓▓▓▓              
+                         ░░░███▓▓▓▓██▒░░                             ▓▓███▓▓▓▓███▓▓▓▓▓              
+                            ███▓▓▓▓███                                 ███▓▓▓▓███                   
+                              ██████                                     ██████
+```

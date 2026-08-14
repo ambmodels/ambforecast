@@ -354,3 +354,65 @@ def plot_observed_against_forecast(historic, forecast, metric, area):
     ax.set_xlim(axis_min - padding, axis_max + padding)
     ax.set_ylim(axis_min - padding, axis_max + padding)
     ax.set_aspect("equal", adjustable="box")
+
+
+def plot_holiday_coverage(data, start=None, historic_end=None):
+    """Visualise when each holiday occurs over the whole time series.
+
+    Create a plot where the X-axis is the date, and then there is a row for
+    each holiday in the dataset, marking each date the holiday is on. This can
+    be used to understand which holidays are included, whether they cover the
+    full range of dates in the dataset, and whether they project beyond the
+    current end date of the historic data.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Holidays data with one row for each holiday date (as returned by
+        expand_holiday_windows()).
+    start : pd.Timestamp | None
+        Start date for the visualisation.
+    historic_end : pd.Timestamp | None
+        Final date in the historic data, marked as a vertical line on the plot.
+
+    """
+    plot_df = data.copy()
+
+    if start is not None:
+        plot_df = plot_df.loc[plot_df["ds"] >= pd.Timestamp(start)]
+
+    # Sort by each holiday's first active date: earliest at the top
+    holidays = (
+        plot_df.groupby("holiday")["ds"].min().sort_values().index.tolist()
+    )
+    holiday_to_y = {holiday: i for i, holiday in enumerate(holidays)}
+
+    _, ax = plt.subplots(figsize=(16, max(6, 0.36 * len(holidays) + 1.5)))
+
+    ax.scatter(
+        plot_df["ds"],
+        plot_df["holiday"].map(holiday_to_y),
+        marker="s",
+        s=50,
+        alpha=0.85,
+        linewidths=0,
+    )
+
+    ax.axvline(historic_end, color="red")
+
+    ax.set_yticks(range(len(holidays)))
+    ax.set_yticklabels(holidays)
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Holiday / event")
+    ax.set_title("Holiday coverage")
+    ax.grid(axis="x", linestyle=":", alpha=0.5)
+
+    ax.xaxis.set_major_locator(mdates.YearLocator())
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
+    ax.xaxis.set_minor_locator(mdates.MonthLocator())
+
+    ax.set_ylim(-0.75, len(holidays) - 0.25)
+    ax.invert_yaxis()
+    ax.margins(x=0.01)
+    plt.tight_layout()
+    plt.show()

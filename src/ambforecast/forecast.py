@@ -11,7 +11,9 @@ from forecast_tools.metrics import (
 )
 from joblib import Parallel, delayed, effective_n_jobs
 from tqdm.auto import tqdm
+import hashlib
 
+from .prophet import prophet
 from .splits import rolling_forecast_origin
 
 
@@ -37,6 +39,25 @@ def unique_pairs(data):
     )
 
 
+def make_seed(*parts):
+    """Create a reproducible integer seed from one or more identifiers.
+
+    Parameters
+    ----------
+    *parts
+        Values that uniquely identify a model fit, such as `metric`, `area`,
+        and, for cross-validation, `fold`.
+
+    Returns
+    -------
+    int
+        A deterministic integer seed suitable for Prophet.
+
+    """
+    key = "|".join(str(p) for p in parts)
+    return int(hashlib.md5(key.encode()).hexdigest(), 16) % (2**32)
+
+
 def run_single_forecast(
     forecast_function,
     train,
@@ -45,6 +66,7 @@ def run_single_forecast(
     area,
     test=None,
     horizon=None,
+    seed_parts=None,
 ):
     """Run a forecast for one metric and area.
 
@@ -71,6 +93,9 @@ def run_single_forecast(
     horizon : int
         Number of days to forecast after the final training date. If None,
         provide `test` instead.
+    seed_parts : tuple | None
+        Values used to create a deterministic random seed for Prophet. Ignored
+        for forecasting functions other than Prophet.
 
     Returns
     -------
@@ -90,9 +115,18 @@ def run_single_forecast(
     else:
         test_subset = None
 
-    forecast = forecast_function(
-        train=train_subset, params=params, test=test_subset, horizon=horizon
-    )
+    forecast_kwargs = {
+        "train": train_subset,
+        "params": params,
+        "test": test_subset,
+        "horizon": horizon,
+    }
+    # Uses metric and area if seed_parts = None
+    if forecast_function is prophet:
+        seed_parts = seed_parts or (metric, area)
+        forecast_kwargs["seed"] = make_seed(*seed_parts)
+
+    forecast = forecast_function(**forecast_kwargs)
 
     forecast.insert(1, "metric", metric)
     forecast.insert(2, "area", area)
@@ -134,6 +168,7 @@ def run_forecasts(
 
     """
     pairs = unique_pairs(train)
+
     if cores == 1:
         forecasts = [
             run_single_forecast(
@@ -144,6 +179,7 @@ def run_forecasts(
                 area=area,
                 test=test,
                 horizon=horizon,
+                seed_parts=(metric, area)  # Only used by Prophet
             )
             for (metric, area) in pairs
         ]
@@ -157,6 +193,7 @@ def run_forecasts(
                 area=area,
                 test=test,
                 horizon=horizon,
+                seed_parts=(metric, area)  # Only used by Prophet
             )
             for (metric, area) in pairs
         )
@@ -240,6 +277,7 @@ def run_cross_validation(
                 params=params,
                 metric=metric,
                 area=area,
+                seed_parts=(fold, metric, area)  # Only used by Prophet
             )
             for fold, metric, area in tqdm(
                 jobs,
@@ -259,6 +297,7 @@ def run_cross_validation(
                 params=params,
                 metric=metric,
                 area=area,
+                seed_parts=(fold, metric, area)  # Only used by Prophet
             )
             for fold, metric, area in jobs
         )

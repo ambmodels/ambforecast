@@ -174,6 +174,44 @@ def validate_holidays(data):
     print("✅ No problems identified in holiday data.")
 
 
+def expand_holiday_windows(data):
+    """Create a row for each holiday date - no lower/upper windows.
+
+    The holidays dataframe is formatted for Prophet with lower_window (0 or
+    below) and upper_window (0 or above) indicating days around a date that
+    are also holidays. This function creates a row for each date in those
+    windows.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Holidays data.
+
+    Returns
+    -------
+    pd.DataFrame
+        Restructured holidays data.
+
+    """
+    return (
+        data.assign(
+            included_dates=lambda df: df.apply(
+                lambda row: pd.date_range(
+                    start=row["ds"] + pd.Timedelta(days=row["lower_window"]),
+                    end=row["ds"] + pd.Timedelta(days=row["upper_window"]),
+                    freq="D",
+                ),
+                axis=1,
+            )
+        )
+        .explode("included_dates", ignore_index=True)
+        .loc[:, ["included_dates", "holiday", "area"]]
+        .rename(columns={"included_dates": "ds"})
+        .sort_values(["area", "ds"])
+        .reset_index(drop=True)
+    )
+
+
 # ----------------------------------------------------------------------------
 # Temperature data
 # ----------------------------------------------------------------------------

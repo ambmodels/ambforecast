@@ -1,11 +1,13 @@
 # ambforecast: open reproducible forecasts of ambulance incidents, calls and responses
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-3-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-4-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 ![](assets/images/forecast.png)
 
 Documentation: <https://ambmodels.github.io/ambforecast/>
+
+<br>
 
 ## Setup
 
@@ -53,6 +55,8 @@ source .venv/bin/activate
 pip install -e .
 ```
 
+<br>
+
 ## Pre-commit
 
 This repository includes a pre-commit hook that checks for the filename of real (private) data, which should never be used here. That analysis belongs in a separate, private repository. If you've accidentally referenced the real data file name in a staged file, the hook will detect it and block the commit, prompting you to remove it before processing.
@@ -63,12 +67,16 @@ To activate this hook after cloning this repository, run:
 pre-commit install
 ```
 
+<br>
+
 ## Documentation (local build)
 
 ```
 great-docs build
 great-docs preview
 ```
+
+<br>
 
 ## Linting and formatting
 
@@ -79,19 +87,19 @@ ruff format
 ruff check --fix
 ```
 
-## Tests
-
-```
-pytest
-```
+<br>
 
 ## Citation
 
-See `CITATION.cff`.
+If you use this repository, please cite us:
+
+> Heather, A., Coulson, L., Irungu, I., & Monks, T. ambforecast: open reproducible forecasts of ambulance incidents, calls and responses [Computer software]. https://github.com/ambmodels/ambdes
+
+<br>
 
 ## Contributors ✨
 
-TODO: Add Lee and Irene once receive GitHub usernames.
+TODO: Add Irene once receive GitHub username.
 
 Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
 
@@ -103,6 +111,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
     <tr>
       <td align="center" valign="top" width="14.28%"><a href="https://www.linkedin.com/in/amyheather"><img src="https://avatars.githubusercontent.com/u/92166537?v=4?s=100" width="100px;" alt="Amy Heather"/><br /><sub><b>Amy Heather</b></sub></a><br /><a href="https://github.com/ambmodels/ambforecast/commits?author=amyheather" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://experts.exeter.ac.uk/19244-thomas-monks"><img src="https://avatars.githubusercontent.com/u/881493?v=4?s=100" width="100px;" alt="Tom Monks"/><br /><sub><b>Tom Monks</b></sub></a><br /><a href="https://github.com/ambmodels/ambforecast/commits?author=TomMonks" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/LeeCoulsonNHS"><img src="https://avatars.githubusercontent.com/u/112544587?v=4?s=100" width="100px;" alt="LeeCoulsonNHS"/><br /><sub><b>LeeCoulsonNHS</b></sub></a><br /><a href="https://github.com/ambmodels/ambforecast/commits?author=LeeCoulsonNHS" title="Code">💻</a> <a href="#data-LeeCoulsonNHS" title="Data">🔣</a> <a href="#ideas-LeeCoulsonNHS" title="Ideas, Planning, & Feedback">🤔</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://www.linkedin.com/in/robchallen"><img src="https://avatars.githubusercontent.com/u/16591648?v=4?s=100" width="100px;" alt="Rob Challen"/><br /><sub><b>Rob Challen</b></sub></a><br /><a href="#ideas-robchallen" title="Ideas, Planning, & Feedback">🤔</a></td>
     </tr>
   </tbody>
@@ -114,6 +123,8 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
 This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
+
+<br>
 
 ## Acknowledgements
 

@@ -1,11 +1,12 @@
 # ambforecast: open reproducible forecasts of ambulance incidents, calls and responses
+
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
 [![All Contributors](https://img.shields.io/badge/all_contributors-4-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
-![](assets/images/forecast.png)
-
 Documentation: <https://ambmodels.github.io/ambforecast/>
+
+![](assets/images/forecast.png)
 
 <br>
 
@@ -57,6 +58,16 @@ pip install -e .
 
 <br>
 
+## Using ambforecast
+
+This repository contains the open-source forecasting code and simple examples showing how to use its main functions.
+
+Making the code open supports transparency, reproducibility, and reuse. It allows others to understand how the forecasts are produced, test and improve the methods, and adapt them for other ambulance services or similar forecasting problems.
+
+The full analysis using real ambulance service data is carried out in the separate private `ambforecast-private` repository. Private analysis outputs are not included here.
+
+<br>
+
 ## Pre-commit
 
 This repository includes a pre-commit hook that checks for the filename of real (private) data, which should never be used here. That analysis belongs in a separate, private repository. If you've accidentally referenced the real data file name in a staged file, the hook will detect it and block the commit, prompting you to remove it before processing.
@@ -69,7 +80,11 @@ pre-commit install
 
 <br>
 
-## Documentation (local build)
+## Documentation
+
+The documentation is rendered and published on GitHub pages via GitHub actions. You can view it at: <https://ambmodels.github.io/ambforecast/>
+
+However, if you would like to render it locally, you can run:
 
 ```
 great-docs build
@@ -80,11 +95,12 @@ great-docs preview
 
 ## Linting and formatting
 
-This will run on all `.py` files and any `.ipynb` notebooks.
+This project uses `ruff` to keep Python code consistent and catch common issues. It's settings are stored in `pyproject.toml`. Run the following commands from the project root to format Python files (`.py`) and notebooks (`.ipynb`). It will automatically fix any linting and formatting issues where possible.
 
 ```
 ruff format
 ruff check --fix
+lintquarto
 ```
 
 <br>

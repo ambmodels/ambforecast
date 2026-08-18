@@ -1,5 +1,6 @@
 """Functions used to run forecasts."""
 
+import hashlib
 from time import perf_counter
 
 import pandas as pd
@@ -11,7 +12,6 @@ from forecast_tools.metrics import (
 )
 from joblib import Parallel, delayed, effective_n_jobs
 from tqdm.auto import tqdm
-import hashlib
 
 from .prophet import prophet
 from .splits import rolling_forecast_origin
@@ -179,7 +179,7 @@ def run_forecasts(
                 area=area,
                 test=test,
                 horizon=horizon,
-                seed_parts=(metric, area)  # Only used by Prophet
+                seed_parts=(metric, area),  # Only used by Prophet
             )
             for (metric, area) in pairs
         ]
@@ -193,7 +193,7 @@ def run_forecasts(
                 area=area,
                 test=test,
                 horizon=horizon,
-                seed_parts=(metric, area)  # Only used by Prophet
+                seed_parts=(metric, area),  # Only used by Prophet
             )
             for (metric, area) in pairs
         )
@@ -277,7 +277,7 @@ def run_cross_validation(
                 params=params,
                 metric=metric,
                 area=area,
-                seed_parts=(fold, metric, area)  # Only used by Prophet
+                seed_parts=(fold, metric, area),  # Only used by Prophet
             )
             for fold, metric, area in tqdm(
                 jobs,
@@ -297,7 +297,7 @@ def run_cross_validation(
                 params=params,
                 metric=metric,
                 area=area,
-                seed_parts=(fold, metric, area)  # Only used by Prophet
+                seed_parts=(fold, metric, area),  # Only used by Prophet
             )
             for fold, metric, area in jobs
         )
@@ -313,12 +313,7 @@ def run_cross_validation(
     # Calculate forecast errors
     errors = []
 
-    for forecast, (fold, metric, area) in tqdm(
-        zip(forecasts, jobs, strict=True),
-        total=len(jobs),
-        desc="Calculating errors",
-        unit="forecast",
-    ):
+    for forecast, (fold, metric, area) in zip(forecasts, jobs, strict=True):
         forecast.insert(0, "fold", fold)
 
         error = forecast_errors(
@@ -330,6 +325,7 @@ def run_cross_validation(
         errors.append(
             {
                 "fold": fold,
+                "forecast_start_date": forecast["ds"].min(),
                 "metric": metric,
                 "area": area,
                 **error,

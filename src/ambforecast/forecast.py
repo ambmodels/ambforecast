@@ -208,6 +208,7 @@ def run_cross_validation(
     step,
     min_train=365 * 2,
     cores=1,
+    error_horizons=(7, 14, 21, 28, 35, 42),
 ):
     """Run rolling forecast origin cross-validation.
 
@@ -236,6 +237,8 @@ def run_cross_validation(
     cores : int
         Number of CPU cores to use. Set to 1 for sequential processing or -1
         to use all available cores.
+    error_horizons: list
+        Horizons to calculate error at.
 
     Returns
     -------
@@ -316,21 +319,23 @@ def run_cross_validation(
     for forecast, (fold, metric, area) in zip(forecasts, jobs, strict=True):
         forecast.insert(0, "fold", fold)
 
-        error = forecast_errors(
-            train=train_folds[fold],
-            test=test_folds[fold],
-            forecast=forecast,
-        )
-
-        errors.append(
-            {
-                "fold": fold,
-                "forecast_start_date": forecast["ds"].min(),
-                "metric": metric,
-                "area": area,
-                **error,
-            }
-        )
+        for error_horizon in error_horizons:
+            error = forecast_errors(
+                train=train_folds[fold],
+                test=test_folds[fold],
+                forecast=forecast,
+                hoziron=error_horizon,
+            )
+            errors.append(
+                {
+                    "fold": fold,
+                    "forecast_start_date": forecast["ds"].min(),
+                    "metric": metric,
+                    "area": area,
+                    "horizon": error_horizon,
+                    **error,
+                }
+            )
 
     forecasts = pd.concat(forecasts, ignore_index=True)
     errors = pd.DataFrame(errors)
@@ -345,7 +350,7 @@ def run_cross_validation(
     return forecasts, errors
 
 
-def forecast_errors(train, test, forecast):
+def forecast_errors(train, test, forecast, horizon=None):
     """Calculate forecast accuracy measures.
 
     Measures included:
@@ -362,6 +367,9 @@ def forecast_errors(train, test, forecast):
         Test data.
     forecast : pd.DataFrame
         Forecast results.
+    horizon : int | None
+        Number of forecast days to include in error calculations. If None,
+        uses the complete forecast and test set
 
     Returns
     -------
@@ -380,6 +388,10 @@ def forecast_errors(train, test, forecast):
     forecast = forecast.sort_values("ds").reset_index(drop=True)
     if not test_subset["ds"].equals(forecast["ds"]):
         raise ValueError("Test and forecast do not contain the same dates.")
+
+    if horizon is not None:
+        test_subset = test_subset.iloc[:horizon]
+        forecast = forecast.iloc[:horizon]
 
     # Calculate forecast accuracy measures
     return {

@@ -297,7 +297,9 @@ def plot_cross_validation(
     fig.tight_layout()
 
 
-def plot_observed_against_forecast(historic, forecast, metric, area):
+def plot_observed_against_forecast(
+    historic, forecast, metric, area, colour=None, ax=None
+):
     """Scatter plot of observed values against forecast values.
 
     Parameters
@@ -310,11 +312,15 @@ def plot_observed_against_forecast(historic, forecast, metric, area):
         Name of metric.
     area : str
         Name of area.
+    colour : str
+        Colour for the scatter plot.
+    ax: matplotlib.axes.Axes | None
+        Axes to create plot on.
 
     Returns
     -------
-    matplotlib.figure.Figure
-        Scatter plot.
+    matplotlib.axes.Axes
+        The axes containing the scatter plot.
 
     """
     # Filter to relevant metric and area
@@ -334,16 +340,21 @@ def plot_observed_against_forecast(historic, forecast, metric, area):
         validate="one_to_one",
     )
 
-    fig, ax = plt.subplots(figsize=(5, 5))
+    if ax is None:
+        _, ax = plt.subplots(figsize=(5, 5))
+
+    # If no colour provided, use default based on metric
+    if colour is None:
+        colour = DEFAULT_COLOURS.get(metric, "tab:red")
 
     axis_min = data[["y", "forecast"]].min().min()
     axis_max = data[["y", "forecast"]].max().max()
 
     # Scatter plot
-    ax.scatter(data["y"], data["forecast"], alpha=0.5, s=25)
+    ax.scatter(data["y"], data["forecast"], color=colour, alpha=0.5, s=25)
 
     # Diagonal line
-    ax.axline((axis_min, axis_min), slope=1, ls="--")
+    ax.axline((axis_min, axis_min), slope=1, color=colour, ls="--")
 
     ax.set_xlabel("Observed")
     ax.set_ylabel("Forecast")
@@ -354,6 +365,8 @@ def plot_observed_against_forecast(historic, forecast, metric, area):
     ax.set_xlim(axis_min - padding, axis_max + padding)
     ax.set_ylim(axis_min - padding, axis_max + padding)
     ax.set_aspect("equal", adjustable="box")
+
+    return ax
 
 
 def plot_holiday_coverage(data, start=None, historic_end=None):

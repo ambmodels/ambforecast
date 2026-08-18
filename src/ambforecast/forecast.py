@@ -324,7 +324,7 @@ def run_cross_validation(
                 train=train_folds[fold],
                 test=test_folds[fold],
                 forecast=forecast,
-                hoziron=error_horizon,
+                horizon=error_horizon,
             )
             errors.append(
                 {

@@ -429,3 +429,109 @@ def plot_holiday_coverage(data, start=None, historic_end=None):
     ax.margins(x=0.01)
     plt.tight_layout()
     plt.show()
+
+
+
+def plot_error_over_time(error_df, error_name, metric, area, error_horizons):
+    """Plot error over time.
+
+    Parameters
+    ----------
+    error_df : pd.DataFrame
+        Dataframe with errors for each fold, metric and area (as returned by
+        forecast_errors()).
+    error_name : str
+        Name of error column in `error_df` to plot.
+    metric : str
+        Name of ambulance metric to plot.
+    area : str
+        Name of area to plot.
+    error_horizons : int | list[int] | tuple[int, ...]
+        One or more error horizons to plot, for example `42` or `[7, 42]`.
+
+    """
+    if isinstance(error_horizons, int):
+        error_horizons = [error_horizons]
+    error_horizons = sorted(set(error_horizons))
+
+    # Filter to relevant metric and area
+    error_plot = error_df[
+        (error_df["metric"] == metric) &
+        (error_df["area"] == area)
+    ].sort_values("forecast_start_date")
+
+    fig, ax = plt.subplots(figsize=(12, 5))
+
+    for horizon in error_horizons:
+        horizon_errors = error_plot[error_plot["horizon"] == horizon]
+        ax.plot(
+            horizon_errors["forecast_start_date"],
+            horizon_errors[error_name],
+            marker="o",
+            label=f"{horizon}-day horizon",
+        )
+
+    ax.set_xlabel("Start date of cross-validation fold")
+    ax.set_ylabel(error_name)
+    ax.set_title(f"{error_name} {metric} {area}")
+    ax.legend(title="Forecast horizon")
+    ax.grid()
+
+
+def plot_error_boxplot(error_df, error_name, metric, area):
+    """Plot cross-validation error distributions by forecast horizon.
+
+    Parameters
+    ----------
+    error_df : pd.DataFrame
+        Dataframe with errors for each fold, metric, area, and horizon.
+    error_name : str
+        Name of error column in `error_df` to plot.
+    metric : str
+        Name of ambulance metric to plot.
+    area : str
+        Name of area to plot.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        Axes containing the boxplot.
+    """
+    error_plot = error_df.loc[
+        (error_df["metric"] == metric)
+        & (error_df["area"] == area)
+    ]
+
+    horizons = sorted(error_plot["horizon"].unique())
+
+    box_data = [
+        error_plot.loc[
+            error_plot["horizon"] == horizon,
+            error_name,
+        ].dropna()
+        for horizon in horizons
+    ]
+
+    _, ax = plt.subplots(figsize=(10, 5))
+
+    if error_name == "coverage":
+        ax.axhline(
+            y=0.95,
+            color="red",
+            label="95% target coverage",
+        )
+        ax.legend()
+
+    ax.boxplot(
+        box_data,
+        tick_labels=[f"{horizon}-day" for horizon in horizons],
+    )
+
+    ax.set_xlabel("Forecast horizon")
+    ax.set_ylabel(error_name)
+    ax.set_title(
+        f"{error_name} {metric} {area}"
+    )
+    ax.grid(axis="y")
+
+    return ax

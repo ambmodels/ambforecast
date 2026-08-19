@@ -476,7 +476,7 @@ def plot_error_over_time(error_df, error_name, metric, area, error_horizons):
     ax.grid()
 
 
-def plot_error_boxplot(error_df, error_name, metric, area):
+def plot_error_boxplot(error_df, error_name, metric, area, ax=None, title=None):
     """Plot cross-validation error distributions by forecast horizon.
 
     Parameters
@@ -489,6 +489,10 @@ def plot_error_boxplot(error_df, error_name, metric, area):
         Name of ambulance metric to plot.
     area : str
         Name of area to plot.
+    ax : matplotlib.axes.Axes | None
+        Axis to plot on.
+    title : str | None
+        Title for the plot.
 
     Returns
     -------
@@ -510,7 +514,8 @@ def plot_error_boxplot(error_df, error_name, metric, area):
         for horizon in horizons
     ]
 
-    _, ax = plt.subplots(figsize=(10, 5))
+    if ax is None:
+        _, ax = plt.subplots(figsize=(10, 5))
 
     if error_name == "coverage":
         ax.axhline(
@@ -527,7 +532,11 @@ def plot_error_boxplot(error_df, error_name, metric, area):
 
     ax.set_xlabel("Forecast horizon")
     ax.set_ylabel(error_name)
-    ax.set_title(f"{error_name} {metric} {area}")
     ax.grid(axis="y")
+
+    if title is None:
+        ax.set_title(f"{error_name} {metric} {area}")
+    else:
+        ax.set_title(title)
 
     return ax

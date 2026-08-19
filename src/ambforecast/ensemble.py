@@ -6,8 +6,9 @@ import pandas as pd
 def ensemble(forecasts):
     """Calculate the mean of multiple forecasts.
 
-    This function will work with the outputs of run_single_forecast() and
-    run_forecasts().
+    Works with ordinary forecasts and cross-validation forecasts. Any shared
+    identifier columns (`fold` and `forecast_start_date`) are retained and
+    used to align forecasts before averaging.
 
     Parameters
     ----------
@@ -21,6 +22,13 @@ def ensemble(forecasts):
 
     """
     keys = ["ds", "metric", "area"]
+
+    # Retain optional identifiers only when every forecast contains them.
+    keys = ["ds", "metric", "area"] + [
+        column
+        for column in ["fold", "forecast_start_date"]
+        if all(column in forecast.columns for forecast in forecasts)
+    ]
 
     # Checking for issues before combining
     reference = forecasts[0][keys].sort_values(keys).reset_index(drop=True)
@@ -46,4 +54,5 @@ def ensemble(forecasts):
             }
         )
         .sort_values(["ds", "metric", "area"])
+        .reset_index(drop=True)
     )

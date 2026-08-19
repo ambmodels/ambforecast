@@ -431,7 +431,6 @@ def plot_holiday_coverage(data, start=None, historic_end=None):
     plt.show()
 
 
-
 def plot_error_over_time(error_df, error_name, metric, area, error_horizons):
     """Plot error over time.
 
@@ -456,8 +455,7 @@ def plot_error_over_time(error_df, error_name, metric, area, error_horizons):
 
     # Filter to relevant metric and area
     error_plot = error_df[
-        (error_df["metric"] == metric) &
-        (error_df["area"] == area)
+        (error_df["metric"] == metric) & (error_df["area"] == area)
     ].sort_values("forecast_start_date")
 
     fig, ax = plt.subplots(figsize=(12, 5))
@@ -496,10 +494,10 @@ def plot_error_boxplot(error_df, error_name, metric, area):
     -------
     matplotlib.axes.Axes
         Axes containing the boxplot.
+
     """
     error_plot = error_df.loc[
-        (error_df["metric"] == metric)
-        & (error_df["area"] == area)
+        (error_df["metric"] == metric) & (error_df["area"] == area)
     ]
 
     horizons = sorted(error_plot["horizon"].unique())
@@ -529,9 +527,7 @@ def plot_error_boxplot(error_df, error_name, metric, area):
 
     ax.set_xlabel("Forecast horizon")
     ax.set_ylabel(error_name)
-    ax.set_title(
-        f"{error_name} {metric} {area}"
-    )
+    ax.set_title(f"{error_name} {metric} {area}")
     ax.grid(axis="y")
 
     return ax

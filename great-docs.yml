@@ -88,10 +88,10 @@ reference:
       - preprocessing.validate_historic
       - preprocessing.prepare_holidays
       - preprocessing.validate_holidays
+      - preprocessing.expand_holiday_windows
       - preprocessing.prepare_temp
       - preprocessing.interpolate_temp
       - preprocessing.validate_temp
-      - preprocessing.convert_historic_to_weekly
 
   - title: Data splitting
     desc: Create train/test splits and rolling forecast origin samples.
@@ -133,7 +133,8 @@ reference:
   - title: Forecast evaluation
     desc: Calculate forecast accuracy measures.
     contents:
-      - forecast.forecast_errors
+      - errors.forecast_errors
+      - errors.calculate_errors
 
   - title: Plotting
     desc: Visualise results.
@@ -141,6 +142,9 @@ reference:
       - plot.plot_forecast
       - plot.plot_cross_validation
       - plot.plot_observed_against_forecast
+      - plot.plot_holiday_coverage
+      - plot.plot_error_over_time
+      - plot.plot_error_boxplot
 
 # Site URL
 # --------

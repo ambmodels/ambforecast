@@ -297,7 +297,9 @@ def plot_cross_validation(
     fig.tight_layout()
 
 
-def plot_observed_against_forecast(historic, forecast, metric, area):
+def plot_observed_against_forecast(
+    historic, forecast, metric, area, colour=None, ax=None
+):
     """Scatter plot of observed values against forecast values.
 
     Parameters
@@ -310,11 +312,15 @@ def plot_observed_against_forecast(historic, forecast, metric, area):
         Name of metric.
     area : str
         Name of area.
+    colour : str
+        Colour for the scatter plot.
+    ax: matplotlib.axes.Axes | None
+        Axes to create plot on.
 
     Returns
     -------
-    matplotlib.figure.Figure
-        Scatter plot.
+    matplotlib.axes.Axes
+        The axes containing the scatter plot.
 
     """
     # Filter to relevant metric and area
@@ -334,16 +340,21 @@ def plot_observed_against_forecast(historic, forecast, metric, area):
         validate="one_to_one",
     )
 
-    fig, ax = plt.subplots(figsize=(5, 5))
+    if ax is None:
+        _, ax = plt.subplots(figsize=(5, 5))
+
+    # If no colour provided, use default based on metric
+    if colour is None:
+        colour = DEFAULT_COLOURS.get(metric, "tab:red")
 
     axis_min = data[["y", "forecast"]].min().min()
     axis_max = data[["y", "forecast"]].max().max()
 
     # Scatter plot
-    ax.scatter(data["y"], data["forecast"], alpha=0.5, s=25)
+    ax.scatter(data["y"], data["forecast"], color=colour, alpha=0.5, s=25)
 
     # Diagonal line
-    ax.axline((axis_min, axis_min), slope=1, ls="--")
+    ax.axline((axis_min, axis_min), slope=1, color=colour, ls="--")
 
     ax.set_xlabel("Observed")
     ax.set_ylabel("Forecast")
@@ -354,3 +365,169 @@ def plot_observed_against_forecast(historic, forecast, metric, area):
     ax.set_xlim(axis_min - padding, axis_max + padding)
     ax.set_ylim(axis_min - padding, axis_max + padding)
     ax.set_aspect("equal", adjustable="box")
+
+    return ax
+
+
+def plot_holiday_coverage(data, start=None, historic_end=None):
+    """Visualise when each holiday occurs over the whole time series.
+
+    Create a plot where the X-axis is the date, and then there is a row for
+    each holiday in the dataset, marking each date the holiday is on. This can
+    be used to understand which holidays are included, whether they cover the
+    full range of dates in the dataset, and whether they project beyond the
+    current end date of the historic data.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Holidays data with one row for each holiday date (as returned by
+        expand_holiday_windows()).
+    start : pd.Timestamp | None
+        Start date for the visualisation.
+    historic_end : pd.Timestamp | None
+        Final date in the historic data, marked as a vertical line on the plot.
+
+    """
+    plot_df = data.copy()
+
+    if start is not None:
+        plot_df = plot_df.loc[plot_df["ds"] >= pd.Timestamp(start)]
+
+    # Sort by each holiday's first active date: earliest at the top
+    holidays = (
+        plot_df.groupby("holiday")["ds"].min().sort_values().index.tolist()
+    )
+    holiday_to_y = {holiday: i for i, holiday in enumerate(holidays)}
+
+    _, ax = plt.subplots(figsize=(16, max(6, 0.36 * len(holidays) + 1.5)))
+
+    ax.scatter(
+        plot_df["ds"],
+        plot_df["holiday"].map(holiday_to_y),
+        marker="s",
+        s=50,
+        alpha=0.85,
+        linewidths=0,
+    )
+
+    ax.axvline(historic_end, color="red")
+
+    ax.set_yticks(range(len(holidays)))
+    ax.set_yticklabels(holidays)
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Holiday / event")
+    ax.set_title("Holiday coverage")
+    ax.grid(axis="x", linestyle=":", alpha=0.5)
+
+    ax.xaxis.set_major_locator(mdates.YearLocator())
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
+    ax.xaxis.set_minor_locator(mdates.MonthLocator())
+
+    ax.set_ylim(-0.75, len(holidays) - 0.25)
+    ax.invert_yaxis()
+    ax.margins(x=0.01)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_error_over_time(error_df, error_name, metric, area, error_horizons):
+    """Plot error over time.
+
+    Parameters
+    ----------
+    error_df : pd.DataFrame
+        Dataframe with errors for each fold, metric and area (as returned by
+        forecast_errors()).
+    error_name : str
+        Name of error column in `error_df` to plot.
+    metric : str
+        Name of ambulance metric to plot.
+    area : str
+        Name of area to plot.
+    error_horizons : int | list[int] | tuple[int, ...]
+        One or more error horizons to plot, for example `42` or `[7, 42]`.
+
+    """
+    if isinstance(error_horizons, int):
+        error_horizons = [error_horizons]
+    error_horizons = sorted(set(error_horizons))
+
+    # Filter to relevant metric and area
+    error_plot = error_df[
+        (error_df["metric"] == metric) & (error_df["area"] == area)
+    ].sort_values("forecast_start_date")
+
+    fig, ax = plt.subplots(figsize=(12, 5))
+
+    for horizon in error_horizons:
+        horizon_errors = error_plot[error_plot["horizon"] == horizon]
+        ax.plot(
+            horizon_errors["forecast_start_date"],
+            horizon_errors[error_name],
+            marker="o",
+            label=f"{horizon}-day horizon",
+        )
+
+    ax.set_xlabel("Start date of cross-validation fold")
+    ax.set_ylabel(error_name)
+    ax.set_title(f"{error_name} {metric} {area}")
+    ax.legend(title="Forecast horizon")
+    ax.grid()
+
+
+def plot_error_boxplot(error_df, error_name, metric, area):
+    """Plot cross-validation error distributions by forecast horizon.
+
+    Parameters
+    ----------
+    error_df : pd.DataFrame
+        Dataframe with errors for each fold, metric, area, and horizon.
+    error_name : str
+        Name of error column in `error_df` to plot.
+    metric : str
+        Name of ambulance metric to plot.
+    area : str
+        Name of area to plot.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+        Axes containing the boxplot.
+
+    """
+    error_plot = error_df.loc[
+        (error_df["metric"] == metric) & (error_df["area"] == area)
+    ]
+
+    horizons = sorted(error_plot["horizon"].unique())
+
+    box_data = [
+        error_plot.loc[
+            error_plot["horizon"] == horizon,
+            error_name,
+        ].dropna()
+        for horizon in horizons
+    ]
+
+    _, ax = plt.subplots(figsize=(10, 5))
+
+    if error_name == "coverage":
+        ax.axhline(
+            y=0.95,
+            color="red",
+            label="95% target coverage",
+        )
+        ax.legend()
+
+    ax.boxplot(
+        box_data,
+        tick_labels=[f"{horizon}-day" for horizon in horizons],
+    )
+
+    ax.set_xlabel("Forecast horizon")
+    ax.set_ylabel(error_name)
+    ax.set_title(f"{error_name} {metric} {area}")
+    ax.grid(axis="y")
+
+    return ax

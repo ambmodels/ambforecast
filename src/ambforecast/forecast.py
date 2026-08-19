@@ -1,17 +1,16 @@
 """Functions used to run forecasts."""
 
+import hashlib
 from time import perf_counter
 
+import numpy as np
 import pandas as pd
 from forecast_tools.metrics import (
-    coverage,
-    mean_absolute_scaled_error,
-    root_mean_squared_error,
-    symmetric_mean_absolute_percentage_error,
+    SNaive,
+    mean_absolute_error,
 )
 from joblib import Parallel, delayed, effective_n_jobs
 from tqdm.auto import tqdm
-import hashlib
 
 from .prophet import prophet
 from .splits import rolling_forecast_origin
@@ -56,6 +55,40 @@ def make_seed(*parts):
     """
     key = "|".join(str(p) for p in parts)
     return int(hashlib.md5(key.encode()).hexdigest(), 16) % (2**32)
+
+
+def mae_insample(y_train, period=1):
+    """In-sample MAE of a naive forecast, used to scale MASE.
+
+    Store this value with each forecast so that MASE can be calculated later
+    without retaining the complete training dataset. This makes forecast
+    evaluation self-contained for ordinary forecasts, cross-validation
+    forecasts, and ensembles.
+
+    Acknowledgements: This code is adapted from mean_absolute_scaled_error()
+    in forecast-tools (https://github.com/TomMonks/forecast-tools).
+
+    Parameters
+    ----------
+    y_train : array-like
+        Actual observations from time series.
+    period : int
+        Lag used by the naive benchmark. A value of 1 uses a one-step naive
+        forecast. A value such as 7 for daily data uses a seasonal-naive
+        forecast based on the value seven days earlier.
+
+    Returns
+    -------
+    float
+        In-sample MAE of the naive forecast, i.e., MASE denominator.
+
+    """
+    y_train = np.asarray(y_train).flatten()
+    in_sample = SNaive(period=period)
+    in_sample.fit(y_train)
+    return mean_absolute_error(
+        y_train[period:], in_sample.fittedvalues.dropna()
+    )
 
 
 def run_single_forecast(
@@ -128,8 +161,24 @@ def run_single_forecast(
 
     forecast = forecast_function(**forecast_kwargs)
 
+    # Retain actual value from test data to use in error calculations
+    if test_subset is not None:
+        actuals = (
+            test_subset[["ds", "y"]]
+            .sort_values("ds")
+            .rename(columns={"y": "actual"})
+        )
+        forecast = forecast.merge(
+            actuals, on="ds", how="left", validate="one_to_one"
+        )
+        # Calculate in-sample MAE (used later to calculate MASE without
+        # needing to retain training data)
+        forecast["mae_insample"] = mae_insample(train_subset["y"])
+
+    # Add columns with metric and area
     forecast.insert(1, "metric", metric)
     forecast.insert(2, "area", area)
+
     return forecast
 
 
@@ -179,7 +228,7 @@ def run_forecasts(
                 area=area,
                 test=test,
                 horizon=horizon,
-                seed_parts=(metric, area)  # Only used by Prophet
+                seed_parts=(metric, area),  # Only used by Prophet
             )
             for (metric, area) in pairs
         ]
@@ -193,7 +242,7 @@ def run_forecasts(
                 area=area,
                 test=test,
                 horizon=horizon,
-                seed_parts=(metric, area)  # Only used by Prophet
+                seed_parts=(metric, area),  # Only used by Prophet
             )
             for (metric, area) in pairs
         )
@@ -208,6 +257,7 @@ def run_cross_validation(
     step,
     min_train=365 * 2,
     cores=1,
+    error_horizons=(7, 14, 21, 28, 35, 42),
 ):
     """Run rolling forecast origin cross-validation.
 
@@ -236,12 +286,13 @@ def run_cross_validation(
     cores : int
         Number of CPU cores to use. Set to 1 for sequential processing or -1
         to use all available cores.
+    error_horizons: list
+        Horizons to calculate error at.
 
     Returns
     -------
-    forecasts, errors : tuple[pd.DataFrame, pd.DataFrame]
+    forecasts : pd.DataFrame
         Forecasts contains results for every fold, metric, and area.
-        Errors contains accuracy measures for every fold, metric, and area.
 
     """
     start_time = perf_counter()
@@ -277,7 +328,7 @@ def run_cross_validation(
                 params=params,
                 metric=metric,
                 area=area,
-                seed_parts=(fold, metric, area)  # Only used by Prophet
+                seed_parts=(fold, metric, area),  # Only used by Prophet
             )
             for fold, metric, area in tqdm(
                 jobs,
@@ -297,7 +348,7 @@ def run_cross_validation(
                 params=params,
                 metric=metric,
                 area=area,
-                seed_parts=(fold, metric, area)  # Only used by Prophet
+                seed_parts=(fold, metric, area),  # Only used by Prophet
             )
             for fold, metric, area in jobs
         )
@@ -310,34 +361,10 @@ def run_cross_validation(
             )
         )
 
-    # Calculate forecast errors
-    errors = []
-
-    for forecast, (fold, metric, area) in tqdm(
-        zip(forecasts, jobs, strict=True),
-        total=len(jobs),
-        desc="Calculating errors",
-        unit="forecast",
-    ):
+    for forecast, (fold, _metric, _area) in zip(forecasts, jobs, strict=True):
         forecast.insert(0, "fold", fold)
 
-        error = forecast_errors(
-            train=train_folds[fold],
-            test=test_folds[fold],
-            forecast=forecast,
-        )
-
-        errors.append(
-            {
-                "fold": fold,
-                "metric": metric,
-                "area": area,
-                **error,
-            }
-        )
-
     forecasts = pd.concat(forecasts, ignore_index=True)
-    errors = pd.DataFrame(errors)
 
     elapsed_seconds = round(perf_counter() - start_time)
     minutes, seconds = divmod(elapsed_seconds, 60)
@@ -346,60 +373,4 @@ def run_cross_validation(
         f"{minutes} minute(s) and {seconds} second(s)."
     )
 
-    return forecasts, errors
-
-
-def forecast_errors(train, test, forecast):
-    """Calculate forecast accuracy measures.
-
-    Measures included:
-    - RMSE (root mean squared error)
-    - MASE (mean absolute scaled error)
-    - sMAPE (symmetric mean absolute percentage error)
-    - Coverage (prediction interval coverage)
-
-    Parameters
-    ----------
-    train : pd.DataFrame
-        Historic data used to train the model.
-    test : pd.DataFrame
-        Test data.
-    forecast : pd.DataFrame
-        Forecast results.
-
-    Returns
-    -------
-    dict
-        Dictionary of forecast accuracy measures.
-
-    """
-    # Filter training and test data to the metric and area in the forecast
-    metric = forecast["metric"].iloc[0]
-    area = forecast["area"].iloc[0]
-    train_subset = train[(train["metric"] == metric) & (train["area"] == area)]
-    test_subset = test[(test["metric"] == metric) & (test["area"] == area)]
-
-    # Check that forecast and training data have same dates
-    test_subset = test_subset.sort_values("ds").reset_index(drop=True)
-    forecast = forecast.sort_values("ds").reset_index(drop=True)
-    if not test_subset["ds"].equals(forecast["ds"]):
-        raise ValueError("Test and forecast do not contain the same dates.")
-
-    # Calculate forecast accuracy measures
-    return {
-        "rmse": root_mean_squared_error(
-            y_true=test_subset["y"], y_pred=forecast["forecast"]
-        ),
-        "mase": mean_absolute_scaled_error(
-            y_true=test_subset["y"],
-            y_pred=forecast["forecast"],
-            y_train=train_subset["y"],
-        ),
-        "smape": symmetric_mean_absolute_percentage_error(
-            y_true=test_subset["y"], y_pred=forecast["forecast"]
-        ),
-        "coverage": coverage(
-            y_true=test_subset["y"],
-            pred_intervals=forecast[["pi_lower", "pi_upper"]].values.tolist(),
-        ),
-    }
+    return forecasts

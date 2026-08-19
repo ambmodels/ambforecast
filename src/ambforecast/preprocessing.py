@@ -74,48 +74,6 @@ def validate_historic(data):
     print("✅ No problems identified in historic data.")
 
 
-def convert_historic_to_weekly(data):
-    """Convert daily historic counts to weekly counts.
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        Daily historic data.
-
-    Returns
-    -------
-    pd.DataFrame
-        Weekly historic data.
-
-    """
-    daily = data.copy()
-
-    # Convert to Mon-Sun weeks, and get start date (the Monday)
-    daily["week_start"] = daily["ds"].dt.to_period("W-SUN").dt.start_time
-
-    # Sum counts each week, and find number of dates within each week
-    weekly = (
-        daily.groupby(
-            ["week_start", "metric", "area"],
-            as_index=False,
-        )
-        .agg(
-            y=("y", "sum"),
-            n_days=("ds", "nunique"),
-        )
-        .rename(columns={"week_start": "ds"})
-    )
-
-    # Do not use incomplete weeks, especially the most recent ongoing week.
-    weekly = weekly.loc[weekly["n_days"] == 7].copy()
-
-    return (
-        weekly.drop(columns="n_days")
-        .sort_values(["ds", "metric", "area"])
-        .reset_index(drop=True)
-    )
-
-
 # ----------------------------------------------------------------------------
 # Holiday data
 # ----------------------------------------------------------------------------
@@ -172,6 +130,44 @@ def validate_holidays(data):
             raise ValueError(f"'{col}' must be integer.")
 
     print("✅ No problems identified in holiday data.")
+
+
+def expand_holiday_windows(data):
+    """Create a row for each holiday date - no lower/upper windows.
+
+    The holidays dataframe is formatted for Prophet with lower_window (0 or
+    below) and upper_window (0 or above) indicating days around a date that
+    are also holidays. This function creates a row for each date in those
+    windows.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Holidays data.
+
+    Returns
+    -------
+    pd.DataFrame
+        Restructured holidays data.
+
+    """
+    return (
+        data.assign(
+            included_dates=lambda df: df.apply(
+                lambda row: pd.date_range(
+                    start=row["ds"] + pd.Timedelta(days=row["lower_window"]),
+                    end=row["ds"] + pd.Timedelta(days=row["upper_window"]),
+                    freq="D",
+                ),
+                axis=1,
+            )
+        )
+        .explode("included_dates", ignore_index=True)
+        .loc[:, ["included_dates", "holiday", "area"]]
+        .rename(columns={"included_dates": "ds"})
+        .sort_values(["area", "ds"])
+        .reset_index(drop=True)
+    )
 
 
 # ----------------------------------------------------------------------------

@@ -74,48 +74,6 @@ def validate_historic(data):
     print("✅ No problems identified in historic data.")
 
 
-def convert_historic_to_weekly(data):
-    """Convert daily historic counts to weekly counts.
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        Daily historic data.
-
-    Returns
-    -------
-    pd.DataFrame
-        Weekly historic data.
-
-    """
-    daily = data.copy()
-
-    # Convert to Mon-Sun weeks, and get start date (the Monday)
-    daily["week_start"] = daily["ds"].dt.to_period("W-SUN").dt.start_time
-
-    # Sum counts each week, and find number of dates within each week
-    weekly = (
-        daily.groupby(
-            ["week_start", "metric", "area"],
-            as_index=False,
-        )
-        .agg(
-            y=("y", "sum"),
-            n_days=("ds", "nunique"),
-        )
-        .rename(columns={"week_start": "ds"})
-    )
-
-    # Do not use incomplete weeks, especially the most recent ongoing week.
-    weekly = weekly.loc[weekly["n_days"] == 7].copy()
-
-    return (
-        weekly.drop(columns="n_days")
-        .sort_values(["ds", "metric", "area"])
-        .reset_index(drop=True)
-    )
-
-
 # ----------------------------------------------------------------------------
 # Holiday data
 # ----------------------------------------------------------------------------

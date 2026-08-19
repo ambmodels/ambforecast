@@ -16,8 +16,9 @@ import pandas as pd
 
 from ambforecast.arima import ARIMAParams, arima
 from ambforecast.ensemble import ensemble
+from ambforecast.errors import calculate_errors
 from ambforecast.forecast import (
-    run_single_forecast, run_forecasts, run_cross_validation, forecast_errors
+    run_single_forecast, run_forecasts, run_cross_validation
 )
 from ambforecast.plot import plot_forecast, plot_cross_validation
 from ambforecast.preprocessing import (
@@ -180,7 +181,7 @@ Dataclasses are used as:
 
 A few different functions are provided in the `plots` module for visualising the forecast results. 
 
-To evaluate forecast accuracy, use `forecast_errors()`.
+To evaluate forecast accuracy, use `calculate_errors()`.
 
 ## Examples
 
@@ -243,7 +244,7 @@ plot_forecast(
 ```{python}
 params = SNaiveParams()
 
-forecast, errors = run_cross_validation(
+forecast = run_cross_validation(
     forecast_function=snaive,
     historic=df_historic,
     params=params,
@@ -284,9 +285,5 @@ forecast = run_single_forecast(
     test=test
 )
 
-forecast_errors(
-    train=train,
-    test=test,
-    forecast=forecast
-)
+calculate_errors(forecast=forecast)
 ```

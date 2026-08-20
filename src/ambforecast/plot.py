@@ -1,14 +1,14 @@
 """Plotting functions."""
 
 import datetime as dt
+import math
 import warnings
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
-import numpy as np
 import pandas as pd
-from scipy.stats import t
+from scipy.stats import ttest_1samp
 
 DEFAULT_COLOURS = {
     "Calls": "tab:blue",
@@ -546,6 +546,38 @@ def plot_error_boxplot(
     return ax
 
 
+def get_mean_ci(values):
+    """Calculate mean, and lower and upper 95% confidence interval bounds.
+
+    Parameters
+    ----------
+    values : pd.Series
+        Values to run calculation on.
+
+    """
+    values = values.dropna()
+    if len(values) < 2:
+        return pd.Series(
+            {
+                "mean": values.mean(),
+                "n_folds": len(values),
+                "lower": float("nan"),
+                "upper": float("nan"),
+            }
+        )
+
+    result = ttest_1samp(values, popmean=0)
+    ci = result.confidence_interval(confidence_level=0.95)
+
+    return pd.Series(
+        {
+            "mean": values.mean(),
+            "lower": ci.low,
+            "upper": ci.high,
+        }
+    )
+
+
 def plot_error_by_area_and_horizon(error_df, error_metric):
     """Plot error metric by area and horizon.
 
@@ -561,40 +593,30 @@ def plot_error_by_area_and_horizon(error_df, error_metric):
     areas = error_df["area"].unique()
 
     # Calculate mean and 95% confidence interval across folds
-    summary = error_df.groupby(
-        ["model", "area", "horizon"], as_index=False
-    ).agg(
-        mean=(error_metric, "mean"),
-        std=(error_metric, "std"),
-        n_folds=(error_metric, "count"),
+    summary = (
+        error_df.groupby(["model", "area", "horizon"])[error_metric]
+        .apply(get_mean_ci)
+        .unstack()
+        .reset_index()
     )
-    summary["ci_half_width"] = (
-        t.ppf(0.05 / 2, summary["n_folds"] - 1)
-        * summary["std"]
-        / np.sqrt(summary["n_folds"])
+
+    ncols = ncols = min(2, len(areas))
+    nrows = math.ceil(len(areas) / ncols)
+    fig, axes = plt.subplots(
+        ncols=ncols,
+        nrows=nrows,
+        figsize=(5 * ncols, 3 * nrows),
+        squeeze=False,
     )
-    summary["lower"] = summary["mean"] - summary["ci_half_width"]
-    summary["upper"] = summary["mean"] + summary["ci_half_width"]
 
-    fig, axes = plt.subplots(ncols=2, nrows=4, figsize=(10, 12))
+    for ax, area in zip(axes.flat, areas, strict=False):
+        area_data = summary[summary["area"] == area]
+        for model, plot_data in area_data.groupby("model"):
+            plot_data = plot_data.sort_values("horizon")
 
-    model_style = {
-        "Ensemble": "tab:blue",
-        "Prophet": "tab:orange",
-        "ARIMA": "tab:green",
-        "SNaive": "tab:purple",
-    }
-
-    for ax, area in zip(axes.flat, areas, strict=True):
-        for model, colour in model_style.items():
-            plot_data = summary[
-                (summary["area"] == area) & (summary["model"] == model)
-            ].sort_values("horizon")
-
-            ax.plot(
+            (line,) = ax.plot(
                 plot_data["horizon"],
                 plot_data["mean"],
-                color=colour,
                 marker="o",
                 markersize=4,
                 label=model,
@@ -603,7 +625,7 @@ def plot_error_by_area_and_horizon(error_df, error_metric):
                 plot_data["horizon"],
                 plot_data["lower"],
                 plot_data["upper"],
-                color=colour,
+                color=line.get_color(),
                 alpha=0.15,
             )
             ax.set_xticks([7, 14, 21, 28, 35, 42])
@@ -626,6 +648,10 @@ def plot_error_by_area_and_horizon(error_df, error_metric):
         frameon=False,
         bbox_to_anchor=(0.5, -0.02),
     )
+
+    # Hide any unused axes
+    for ax in axes.flat[len(areas) :]:
+        ax.set_visible(False)
 
     plt.tight_layout()
     plt.show()

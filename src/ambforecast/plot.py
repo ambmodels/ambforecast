@@ -6,7 +6,9 @@ import warnings
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+import numpy as np
 import pandas as pd
+from scipy.stats import t
 
 DEFAULT_COLOURS = {
     "Calls": "tab:blue",
@@ -476,7 +478,9 @@ def plot_error_over_time(error_df, error_name, metric, area, error_horizons):
     ax.grid()
 
 
-def plot_error_boxplot(error_df, error_name, metric, area, ax=None, title=None):
+def plot_error_boxplot(
+    error_df, error_name, metric, area, ax=None, title=None
+):
     """Plot cross-validation error distributions by forecast horizon.
 
     Parameters
@@ -540,3 +544,88 @@ def plot_error_boxplot(error_df, error_name, metric, area, ax=None, title=None):
         ax.set_title(title)
 
     return ax
+
+
+def plot_error_by_area_and_horizon(error_df, error_metric):
+    """Plot error metric by area and horizon.
+
+    Parameters
+    ----------
+    error_df : pd.DataFrame
+        Single dataframe with errors from multiple models.
+    error_metric : str
+        Name of error metric to plot.
+
+    """
+    # Find areas
+    areas = error_df["area"].unique()
+
+    # Calculate mean and 95% confidence interval across folds
+    summary = error_df.groupby(
+        ["model", "area", "horizon"], as_index=False
+    ).agg(
+        mean=(error_metric, "mean"),
+        std=(error_metric, "std"),
+        n_folds=(error_metric, "count"),
+    )
+    summary["ci_half_width"] = (
+        t.ppf(0.05 / 2, summary["n_folds"] - 1)
+        * summary["std"]
+        / np.sqrt(summary["n_folds"])
+    )
+    summary["lower"] = summary["mean"] - summary["ci_half_width"]
+    summary["upper"] = summary["mean"] + summary["ci_half_width"]
+
+    fig, axes = plt.subplots(ncols=2, nrows=4, figsize=(10, 12))
+
+    model_style = {
+        "Ensemble": "tab:blue",
+        "Prophet": "tab:orange",
+        "ARIMA": "tab:green",
+        "SNaive": "tab:purple",
+    }
+
+    for ax, area in zip(axes.flat, areas, strict=True):
+        for model, colour in model_style.items():
+            plot_data = summary[
+                (summary["area"] == area) & (summary["model"] == model)
+            ].sort_values("horizon")
+
+            ax.plot(
+                plot_data["horizon"],
+                plot_data["mean"],
+                color=colour,
+                marker="o",
+                markersize=4,
+                label=model,
+            )
+            ax.fill_between(
+                plot_data["horizon"],
+                plot_data["lower"],
+                plot_data["upper"],
+                color=colour,
+                alpha=0.15,
+            )
+            ax.set_xticks([7, 14, 21, 28, 35, 42])
+            ax.set_title(area)
+            ax.grid(alpha=0.25)
+
+    for ax in axes[:, 0]:
+        ax.set_ylabel(error_metric)
+
+    for ax in axes[-1, :]:
+        ax.set_xlabel("Horizon (days)")
+
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        ncol=2,
+        frameon=False,
+        bbox_to_anchor=(0.5, -0.02),
+    )
+
+    plt.tight_layout()
+    plt.show()

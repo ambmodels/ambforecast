@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 
 import pandas as pd
+from rich import print
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel
 
 from .structures import CustomRepr
@@ -34,7 +35,7 @@ class ETSParams(CustomRepr):
 
     """
 
-    error : str = "additive"
+    error: str = "additive"
     trend: str = "additive"
     damped_trend: bool = True
     seasonal: str = "additive"
@@ -79,9 +80,15 @@ def ets(train, params, test=None, horizon=None):
         trend=params.trend,
         damped_trend=params.damped_trend,
         seasonal=params.seasonal,
-        seasonal_periods=params.seasonal_periods
+        seasonal_periods=params.seasonal_periods,
     )
     fitted = model.fit()
+
+    # View the chosen parameter values
+    param_values = dict(
+        zip(fitted.model.param_names, fitted.params, strict=True)
+    )
+    print(param_values)
 
     # Get dates for forecast
     if test is not None:
@@ -96,8 +103,7 @@ def ets(train, params, test=None, horizon=None):
     # Get forecast for those dates and extract summary dataframe
     horizon = len(forecast_dates)
     pred = fitted.get_prediction(
-        start=len(train),
-        end=len(train) + horizon - 1
+        start=len(train), end=len(train) + horizon - 1
     )
     forecast = pred.summary_frame(alpha=1 - params.interval_width)
 

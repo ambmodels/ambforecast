@@ -43,11 +43,18 @@ def train_test_split(data, horizon, min_train=365 * 2, test_end=None):
     return train, test
 
 
-def rolling_forecast_origin(data, horizon, step, min_train=365 * 2):
+def rolling_forecast_origin(
+    data,
+    horizon,
+    step,
+    min_train=365 * 2,
+    first_test_start=None
+):
     """Create rolling forecast origin train/test samples.
 
-    Samples are generated from the most recent data backwards. The test period
-    moves back by `step` days for each fold.
+    By default, samples are generated from the most recent data backwards.
+    The test period moves back by `step` days for each fold. However, if
+    `first_test_start` is provided, it will move forwards from that date.
 
     Parameters
     ----------
@@ -62,6 +69,9 @@ def rolling_forecast_origin(data, horizon, step, min_train=365 * 2):
     min_train : int
         Minimum number of days to include in training sample. By default,
         set to 2 years as that allows detection of yearly seasonality.
+    first_test_start : pd.Timestamp
+        First date of the first test fold. If None, folds are generated
+        backwards until the remaining training data falls below `min_train`.
 
     Returns
     -------
@@ -81,20 +91,54 @@ def rolling_forecast_origin(data, horizon, step, min_train=365 * 2):
     test_samples = []
     test_end = data["ds"].max()
 
-    while True:
-        try:
-            train, test = train_test_split(
-                data=data,
-                horizon=horizon,
-                min_train=min_train,
-                test_end=test_end,
-            )
-        except ValueError:
-            break
+    # By default - rolling backwards
+    if first_test_start is None:
+        while True:
+            try:
+                train, test = train_test_split(
+                    data=data,
+                    horizon=horizon,
+                    min_train=min_train,
+                    test_end=test_end,
+                )
+            except ValueError:
+                break
 
-        train_samples.append(train)
-        test_samples.append(test)
+            train_samples.append(train)
+            test_samples.append(test)
 
-        test_end -= dt.timedelta(days=step)
+            test_end -= dt.timedelta(days=step)
+
+    # Starting tests from a specified date onwards
+    else:
+        test_start = first_test_start
+        last_available_date = data["ds"].max()
+
+        while True:
+            test_end = test_start + dt.timedelta(days=horizon - 1)
+
+            # Only create folds containing a complete test horizon
+            if test_end > last_available_date:
+                break
+
+            try:
+                train, test = train_test_split(
+                    data=data,
+                    horizon=horizon,
+                    min_train=min_train,
+                    test_end=test_end
+                )
+            except ValueError as error:
+                raise ValueError(
+                    "Cannot create the first requested cross-validation fold. "
+                    f"The test period starts on {test_start:%Y-%m-%d}, "
+                    f"ends on {test_end:%Y-%m-%d}, and requires at least "
+                    f"{min_train} unique training days."
+                ) from error
+
+            train_samples.append(train)
+            test_samples.append(test)
+
+            test_start += dt.timedelta(days=step)
 
     return train_samples, test_samples

@@ -256,8 +256,8 @@ def run_cross_validation(
     horizon,
     step,
     min_train=365 * 2,
+    first_test_start=None,
     cores=1,
-    error_horizons=(7, 14, 21, 28, 35, 42),
 ):
     """Run rolling forecast origin cross-validation.
 
@@ -283,11 +283,12 @@ def run_cross_validation(
     min_train : int
         Minimum number of days to include in training sample. By default,
         set to 2 years as that allows detection of yearly seasonality.
+    first_test_start : pd.Timestamp
+        First date of the first test fold. If None, folds are generated
+        backwards until the remaining training data falls below `min_train`.
     cores : int
         Number of CPU cores to use. Set to 1 for sequential processing or -1
         to use all available cores.
-    error_horizons: list
-        Horizons to calculate error at.
 
     Returns
     -------
@@ -299,7 +300,11 @@ def run_cross_validation(
 
     # Create several sets of training and test data
     train_folds, test_folds = rolling_forecast_origin(
-        data=historic, horizon=horizon, step=step, min_train=min_train
+        data=historic,
+        horizon=horizon,
+        step=step,
+        min_train=min_train,
+        first_test_start=first_test_start
     )
 
     # Find unique combinations of metric and area

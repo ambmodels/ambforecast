@@ -43,7 +43,7 @@ class ETSParams(CustomRepr):
     interval_width: float = 0.95
 
 
-def ets(train, params, test=None, horizon=None):
+def ets(train, params, test=None, horizon=None, verbose=False):
     """Fit exponential smoothing model and generate forecast.
 
     Parameters
@@ -59,6 +59,8 @@ def ets(train, params, test=None, horizon=None):
         Number of days to forecast, after the final date in `train`. To be
         used if there is no test set (e.g., if actually predicting into future
         with no data to compare against).
+    verbose : bool
+        Whether to print the chosen parameter values
 
     Returns
     -------
@@ -85,10 +87,11 @@ def ets(train, params, test=None, horizon=None):
     fitted = model.fit()
 
     # View the chosen parameter values
-    param_values = dict(
-        zip(fitted.model.param_names, fitted.params, strict=True)
-    )
-    print(param_values)
+    if verbose:
+        param_values = dict(
+            zip(fitted.model.param_names, fitted.params, strict=True)
+        )
+        print(param_values)
 
     # Get dates for forecast
     if test is not None:

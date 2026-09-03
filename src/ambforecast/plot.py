@@ -251,23 +251,30 @@ def plot_cross_validation(
         zorder=2,
     )
 
-    # Forecast
-    ax.plot(
-        forecast_plot["ds"],
-        forecast_plot["forecast"],
-        color=forecast_colour,
-        label="Forecast",
-        zorder=3,
-    )
-    ax.fill_between(
-        forecast_plot["ds"].to_numpy(),
-        forecast_plot["pi_lower"],
-        forecast_plot["pi_upper"],
-        color=forecast_colour,
-        alpha=0.2,
-        label="95% Prediction Interval",
-        zorder=1,
-    )
+    # Forecast: draw each CV fold independently so lines and intervals
+    # do not connect across fold boundaries.
+    for i, (_, fold_plot) in enumerate(
+        forecast_plot.groupby("fold", sort=True)
+    ):
+        fold_plot = fold_plot.sort_values("ds")
+
+        ax.plot(
+            fold_plot["ds"],
+            fold_plot["forecast"],
+            color=forecast_colour,
+            label="Forecast" if i == 0 else "_nolegend_",
+            zorder=3,
+        )
+
+        ax.fill_between(
+            fold_plot["ds"].to_numpy(),
+            fold_plot["pi_lower"].to_numpy(),
+            fold_plot["pi_upper"].to_numpy(),
+            color=forecast_colour,
+            alpha=0.2,
+            label="95% Prediction Interval" if i == 0 else "_nolegend_",
+            zorder=1,
+        )
 
     # Start and end dates of cross-validation folds
     fold_dates = (

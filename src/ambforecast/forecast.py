@@ -85,12 +85,6 @@ def mae_insample(y_train, period=1):
     """
     y_train = np.asarray(y_train).flatten()
 
-    # Keep only the observations needed for the final period
-    # This is because training data may have missing values that cause errors
-    # for SNaive, but missing values might not actually be in the data used
-    # by SNaive
-    y_train = y_train[-(period + 1):]
-
     in_sample = SNaive(period=period)
     in_sample.fit(y_train)
     return mean_absolute_error(

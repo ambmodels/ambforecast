@@ -287,6 +287,77 @@ def validate_temp(data):
 
 
 # ----------------------------------------------------------------------------
+# Illness data
+# ----------------------------------------------------------------------------
+
+
+def prepare_illness(data):
+    """Prepare UKHSA illness data.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Raw illness data.
+
+    Returns
+    -------
+    pd.DataFrame
+        Cleaned illness data.
+
+    """
+    # Convert to datetime
+    data["ds"] = pd.to_datetime(data["ds"], format="%d/%m/%Y")
+
+    # Restructure from long to wide
+    data = data.pivot(
+        index="ds", columns="metric", values="metric_value"
+    ).rename(columns={"Influenza": "influenza", "RSV": "rsv"})
+
+    # Interpolate from weekly to daily data
+    return (
+        data.sort_index()
+        .resample("D")
+        .interpolate(method="time")
+        .reset_index()
+        .rename_axis(None, axis=1)
+    )
+
+
+def validate_illness(data):
+    """Validate UKHSA illness data.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Illness data.
+
+    Raises
+    ------
+    ValueError
+        If any issues are identified in the data.
+
+    """
+    # Check for missing values (expect missing for COVID before March 2020)
+    find_missing_values(data[["ds", "influenza", "rsv"]])
+    find_missing_values(
+        data[data["ds"] >= pd.Timestamp(day=19, month=3, year=2020)][["covid"]]
+    )
+
+    # Check data types of each column
+    if not pd.api.types.is_datetime64_any_dtype(data["ds"]):
+        raise ValueError("'ds' must be datetime.")
+    for col in ["influenza", "rsv", "covid"]:
+        if not pd.api.types.is_float_dtype(data[col]):
+            raise ValueError(f"'{col}' must be float.")
+
+    # Check for missing and duplicate dates
+    find_missing_dates(data)
+    find_duplicate_dates(data)
+
+    print("✅ No problems identified in illness data.")
+
+
+# ----------------------------------------------------------------------------
 # Helper functions
 # ----------------------------------------------------------------------------
 
@@ -307,17 +378,18 @@ def find_missing_values(data):
         )
 
 
-def find_missing_dates(data, groups):
+def find_missing_dates(data, groups=None):
     """Identify missing dates.
 
-    For example, if data runs from 1 January to 31 December, but one of the
-    groups doesn't have a row for a particular date.
+    Across all data or within groups. For example, if data runs from 1 January
+    to 31 December, but one of the groups doesn't have a row for a particular
+    date.
 
     Parameters
     ----------
     data : pd.DataFrame
         Data containing a datetime `ds` column.
-    groups : list[str]
+    groups : list[str] | None
         List of column names to group by when checking.
 
     Raises
@@ -328,7 +400,8 @@ def find_missing_dates(data, groups):
     """
     missing = {}
 
-    for group, series in data.groupby(groups):
+    grouped_data = data.groupby(groups) if groups else [(None, data)]
+    for group, series in grouped_data:
         dates = series["ds"].sort_values()
         expected_dates = pd.date_range(dates.min(), dates.max(), freq="D")
         missing_dates = expected_dates.difference(dates)
@@ -342,16 +415,17 @@ def find_missing_dates(data, groups):
         )
 
 
-def find_duplicate_dates(data, groups):
-    """Extract duplicate dates within groups.
+def find_duplicate_dates(data, groups=None):
+    """Extract duplicate dates.
 
-    For example, if a group has multiple entries for a single date.
+    Across all data or within groups. For example, if a group has multiple
+    entries for a single date.
 
     Parameters
     ----------
     data : pd.DataFrame
         Data containing a datetime `ds` column.
-    groups : list[str]
+    groups : list[str] | None
         List of column names to group by when checking.
 
     Raises
@@ -362,7 +436,8 @@ def find_duplicate_dates(data, groups):
     """
     duplicates = {}
 
-    for group, series in data.groupby(groups):
+    grouped_data = data.groupby(groups) if groups else [(None, data)]
+    for group, series in grouped_data:
         duplicate_dates = series.loc[
             series["ds"].duplicated(keep=False),
             "ds",

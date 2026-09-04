@@ -1,12 +1,13 @@
 """Functions for calculating forecast errors."""
 
+import numpy as np
 import pandas as pd
 from forecast_tools.metrics import (
     coverage,
     mean_absolute_error,
     root_mean_squared_error,
     symmetric_mean_absolute_percentage_error,
-    winkler_score
+    winkler_score,
 )
 
 
@@ -18,6 +19,8 @@ def forecast_errors(forecast, horizon=None):
     - RMSE (root mean squared error)
     - MASE (mean absolute scaled error)
     - sMAPE (symmetric mean absolute percentage error)
+    - Mean prediction interval width (contextualises winkler and coverage)
+    - Winkler score (also known as the interval score)
     - Coverage (prediction interval coverage)
 
     Parameters
@@ -50,11 +53,12 @@ def forecast_errors(forecast, horizon=None):
         "smape": symmetric_mean_absolute_percentage_error(
             y_true=forecast["actual"], y_pred=forecast["forecast"]
         ),
+        "mean_pi_width": np.mean(forecast["pi_upper"] - forecast["pi_lower"]),
         "winkler": winkler_score(
             y_true=forecast["actual"],
             intervals=forecast[["pi_lower", "pi_upper"]],
             alpha=0.05,
-            return_scores=False
+            return_scores=False,
         ),
         "coverage": coverage(
             y_true=forecast["actual"],

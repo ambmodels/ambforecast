@@ -6,6 +6,7 @@ from forecast_tools.metrics import (
     mean_absolute_error,
     root_mean_squared_error,
     symmetric_mean_absolute_percentage_error,
+    winkler_score
 )
 
 
@@ -48,6 +49,12 @@ def forecast_errors(forecast, horizon=None):
         ),
         "smape": symmetric_mean_absolute_percentage_error(
             y_true=forecast["actual"], y_pred=forecast["forecast"]
+        ),
+        "winkler": winkler_score(
+            y_true=forecast["actual"],
+            intervals=forecast[["pi_lower", "pi_upper"]],
+            alpha=0.05,
+            return_scores=False
         ),
         "coverage": coverage(
             y_true=forecast["actual"],

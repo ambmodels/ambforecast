@@ -92,6 +92,8 @@ reference:
       - preprocessing.prepare_temp
       - preprocessing.interpolate_temp
       - preprocessing.validate_temp
+      - preprocessing.prepare_illness
+      - preprocessing.validate_illness
 
   - title: Data splitting
     desc: Create train/test splits and rolling forecast origin samples.
@@ -102,6 +104,7 @@ reference:
   - title: ARIMA
     desc: Configure and run ARIMA forecasts.
     contents:
+      - arima.ARIMARegressor
       - arima.ARIMAParams
       - arima.arima
 
@@ -111,6 +114,12 @@ reference:
       - prophet.ProphetRegressor
       - prophet.ProphetParams
       - prophet.prophet
+
+  - title: ETS
+    desc: Configure and run ETS forecasts.
+    contents:
+      - ets.ETSParams
+      - ets.ets
 
   - title: Naive benchmark
     desc: Configure and run Seasonal Naive forecasts.
@@ -145,6 +154,7 @@ reference:
       - plot.plot_holiday_coverage
       - plot.plot_error_over_time
       - plot.plot_error_boxplot
+      - plot.plot_error_by_area_and_horizon
 
 # Site URL
 # --------

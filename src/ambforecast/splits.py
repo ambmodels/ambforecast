@@ -44,11 +44,7 @@ def train_test_split(data, horizon, min_train=365 * 2, test_end=None):
 
 
 def rolling_forecast_origin(
-    data,
-    horizon,
-    step,
-    min_train=365 * 2,
-    first_test_start=None
+    data, horizon, step, min_train=365 * 2, first_test_start=None
 ):
     """Create rolling forecast origin train/test samples.
 
@@ -126,7 +122,7 @@ def rolling_forecast_origin(
                     data=data,
                     horizon=horizon,
                     min_train=min_train,
-                    test_end=test_end
+                    test_end=test_end,
                 )
             except ValueError as error:
                 raise ValueError(

@@ -269,11 +269,11 @@ def run_cross_validation(
 
     Parameters
     ----------
-    forecast_function : prophet | arima
+    forecast_function : prophet | arima | etc.
         Forecasting function to run.
     historic : pd.DataFrame
         Historic data used to create rolling training and test samples.
-    params : ProphetParams | ARIMAParams
+    params : ProphetParams | ARIMAParams | etc.
         Parameters for the selected forecasting model.
     horizon : int
         Number of daily observations in each test set.
@@ -305,7 +305,7 @@ def run_cross_validation(
         horizon=horizon,
         step=step,
         min_train=min_train,
-        first_test_start=first_test_start
+        first_test_start=first_test_start,
     )
 
     # Find unique combinations of metric and area

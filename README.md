@@ -68,6 +68,14 @@ The full analysis using real ambulance service data is carried out in the separa
 
 <br>
 
+## Tests
+
+Some simple tests are included to check the ambforecast code. Some of these make use of test data, which are real public ambulance response data from 2013 to 2019 as shared in our prior work:
+
+> Monks, T., Harper, A., Allen, M. et al. Forecasting the daily demand for emergency medical ambulances in England and Wales: a benchmark model and external validation. BMC Med Inform Decis Mak 23, 117 (2023). https://doi.org/10.1186/s12911-023-02218-z
+
+<br>
+
 ## Pre-commit
 
 This repository includes a pre-commit hook that checks for the filename of real (private) data, which should never be used here. That analysis belongs in a separate, private repository. If you've accidentally referenced the real data file name in a staged file, the hook will detect it and block the commit, prompting you to remove it before processing.

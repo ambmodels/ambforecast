@@ -197,11 +197,12 @@ def arima(train, params, test=None, horizon=None):
     regressor_names = [regressor.name for regressor in regressors]
     if regressor_names:
         arima_exog = train.set_index("ds")[regressor_names]
+        arima_exog.index.freq = "D"
     else:
         arima_exog = None
 
     # Fit ARIMA model
-    model = sm.tsa.arima.model.ARIMA(
+    model = sm.tsa.arima.ARIMA(
         endog=arima_train,
         exog=arima_exog,
         order=params.order,

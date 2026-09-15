@@ -12,6 +12,24 @@ from .structures import CustomRepr
 
 
 @dataclass(kw_only=True, repr=False)
+class ARIMARegressor(CustomRepr):
+    """Configuration and data for a single ARIMA exogenous regressor.
+
+    Parameters
+    ----------
+    name : str
+        Name of the regressor column in `data`.
+    data : pd.DataFrame
+        Regressor data with `ds` and column named by `name`. It must cover
+        every training and forecast date required by the model.
+
+    """
+
+    name: str
+    data: pd.DataFrame
+
+
+@dataclass(kw_only=True, repr=False)
 class ARIMAParams(CustomRepr):
     """Parameters for the ARIMA model.
 
@@ -30,6 +48,8 @@ class ARIMAParams(CustomRepr):
         The maximum number of iterations. Using ARIMA default (50), we did
         observe a warning that "Maximum Likelihood optimisation failed to
         converge". This warning can be resolved by increasing the maximum.
+    regressors : tuple[ARIMARegressor, ...]
+        Additional regressors to add before fitting.
     interval_width : float
         Width of the prediction intervals - for example, 0.95 will produce
         95% prediction intervals.
@@ -47,6 +67,7 @@ class ARIMAParams(CustomRepr):
     # ARIMA default
     max_iter: int = 50
 
+    regressors: tuple[ARIMARegressor, ...] = ()
     interval_width: float = 0.95
 
 
@@ -63,14 +84,51 @@ def encode_holidays(dates, holiday_dates):
     Returns
     -------
     pd.DataFrame
-        The index is each date from dates and then the column "holiday" marks
-        whether each date was in holiday_dates or not.
+        Dataframe with `ds` and binary `holiday` column.
 
     """
     dates = pd.DatetimeIndex(dates)
     return pd.DataFrame(
-        {"holiday": dates.isin(holiday_dates)}, index=dates
-    ).astype(int)
+        {
+            "ds": dates,
+            "holiday": dates.isin(holiday_dates).astype(int),
+        }
+    )
+
+
+def merge_arima_regressor(data, regressor):
+    """Merge a regressor and check it covers required dates.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Data containing `ds` column.
+    regressor : ProphetRegressor
+        Regressor configuration and data.
+
+    Returns
+    -------
+    data : pd.DataFrame
+        Data with the regressor column added.
+
+    """
+    data = pd.merge(
+        data,
+        regressor.data[["ds", regressor.name]],
+        on=["ds"],
+        how="left",
+        validate="one_to_one",
+    )
+
+    missing = data.loc[data[regressor.name].isna(), ["ds"]]
+
+    if not missing.empty:
+        raise ValueError(
+            f"Regressor {regressor.name!r} has missing values for:\n"
+            f"{missing.to_string(index=False)}"
+        )
+
+    return data
 
 
 def arima(train, params, test=None, horizon=None):
@@ -103,21 +161,50 @@ def arima(train, params, test=None, horizon=None):
     arima_train = train.set_index("ds")["y"]
     arima_train.index.freq = "D"
 
+    # Create index of dates to make prediction for
+    if test is not None:
+        future = test[["ds"]].copy()
+    else:
+        forecast_dates = pd.date_range(
+            start=arima_train.index.max() + pd.Timedelta(days=1),
+            periods=horizon,
+            freq="D",
+        )
+        future = pd.DataFrame({"ds": forecast_dates})
+
     # Create dataframe where index is each date from the training data and
     # column is "holiday" which is 1 when the date is listed as a holiday and
     # 0 otherwise. This just uses the date - it doesn't use lower_window and
-    # upper_window
-    if params.holidays is not None:
-        arima_holidays = encode_holidays(
-            dates=arima_train.index, holiday_dates=params.holidays["ds"]
-        )
+    # upper_window. Then add this dataframe to the list of regressors.
+    all_dates = pd.concat([train["ds"], future["ds"]], ignore_index=True)
+    if params.holidays is None:
+        regressors = params.regressors
     else:
-        arima_holidays = None
+        holiday = ARIMARegressor(
+            name="holiday",
+            data=encode_holidays(
+                dates=all_dates, holiday_dates=params.holidays["ds"]
+            ),
+        )
+        regressors = (*params.regressors, holiday)
+
+    # Add regressor data to the training data
+    # Will only run loop if regressors are provided
+    for regressor in regressors:
+        train = merge_arima_regressor(data=train, regressor=regressor)
+
+    # Construct dataframe of exogenous regressors
+    regressor_names = [regressor.name for regressor in regressors]
+    if regressor_names:
+        arima_exog = train.set_index("ds")[regressor_names]
+        arima_exog.index.freq = "D"
+    else:
+        arima_exog = None
 
     # Fit ARIMA model
     model = sm.tsa.arima.ARIMA(
         endog=arima_train,
-        exog=arima_holidays,
+        exog=arima_exog,
         order=params.order,
         seasonal_order=params.seasonal_order,
         enforce_stationarity=params.enforce_stationarity,
@@ -135,28 +222,18 @@ def arima(train, params, test=None, horizon=None):
         warnings.filterwarnings("ignore", category=ConvergenceWarning)
         model = model.fit(method_kwargs={"maxiter": params.max_iter})
 
-    # Create index of dates to make prediction for
-    if test is not None:
-        forecast_dates = test["ds"].reset_index(drop=True)
-    else:
-        forecast_dates = pd.date_range(
-            start=arima_train.index.max() + pd.Timedelta(days=1),
-            periods=horizon,
-            freq="D",
-        )
+    # Add regressor data to test data
+    for regressor in regressors:
+        future = merge_arima_regressor(data=future, regressor=regressor)
 
-    # Encode holidays for prediction dates
-    if params.holidays is not None:
-        forecast_holidays = encode_holidays(
-            dates=forecast_dates, holiday_dates=params.holidays["ds"]
-        )
+    # Construct dataframe of exogneous regressors
+    if regressor_names:
+        forecast_exog = future.set_index("ds")[regressor_names]
     else:
-        forecast_holidays = None
+        forecast_exog = None
 
     # Get forecast for those dates and extract summary dataframe
-    model_forecast = model.get_forecast(
-        steps=len(forecast_dates), exog=forecast_holidays
-    )
+    model_forecast = model.get_forecast(steps=len(future), exog=forecast_exog)
     forecast = model_forecast.summary_frame(alpha=1 - params.interval_width)
 
     # Rearranging/relabelling forecast dataframe

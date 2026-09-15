@@ -116,7 +116,7 @@ class ProphetParams(CustomRepr):
     plot_components: bool = False
 
 
-def merge_regressor(data, regressor):
+def merge_prophet_regressor(data, regressor):
     """Merge a regressor and check it covers required dates and area.
 
     Parameters
@@ -209,7 +209,7 @@ def prophet(train, params, test=None, horizon=None, seed=None):
     # Add regressor data to the training data and add them to the model
     # Will only run loop if regressors are provided
     for regressor in params.regressors:
-        train = merge_regressor(data=train, regressor=regressor)
+        train = merge_prophet_regressor(data=train, regressor=regressor)
         model.add_regressor(
             name=regressor.name,
             prior_scale=regressor.prior_scale,
@@ -233,7 +233,7 @@ def prophet(train, params, test=None, horizon=None, seed=None):
     # Add regressor data to the future dataframe
     # Will only run loop if regressors are provided
     for regressor in params.regressors:
-        future = merge_regressor(data=future, regressor=regressor)
+        future = merge_prophet_regressor(data=future, regressor=regressor)
 
     # Generate forecast
     forecast = model.predict(future)

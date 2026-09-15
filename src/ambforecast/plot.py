@@ -1,12 +1,14 @@
 """Plotting functions."""
 
 import datetime as dt
+import math
 import warnings
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import pandas as pd
+from scipy.stats import ttest_1samp
 
 DEFAULT_COLOURS = {
     "Calls": "tab:blue",
@@ -249,23 +251,30 @@ def plot_cross_validation(
         zorder=2,
     )
 
-    # Forecast
-    ax.plot(
-        forecast_plot["ds"],
-        forecast_plot["forecast"],
-        color=forecast_colour,
-        label="Forecast",
-        zorder=3,
-    )
-    ax.fill_between(
-        forecast_plot["ds"].to_numpy(),
-        forecast_plot["pi_lower"],
-        forecast_plot["pi_upper"],
-        color=forecast_colour,
-        alpha=0.2,
-        label="95% Prediction Interval",
-        zorder=1,
-    )
+    # Forecast: draw each CV fold independently so lines and intervals
+    # do not connect across fold boundaries.
+    for i, (_, fold_plot) in enumerate(
+        forecast_plot.groupby("fold", sort=True)
+    ):
+        fold_plot = fold_plot.sort_values("ds")
+
+        ax.plot(
+            fold_plot["ds"],
+            fold_plot["forecast"],
+            color=forecast_colour,
+            label="Forecast" if i == 0 else "_nolegend_",
+            zorder=3,
+        )
+
+        ax.fill_between(
+            fold_plot["ds"].to_numpy(),
+            fold_plot["pi_lower"].to_numpy(),
+            fold_plot["pi_upper"].to_numpy(),
+            color=forecast_colour,
+            alpha=0.2,
+            label="95% Prediction Interval" if i == 0 else "_nolegend_",
+            zorder=1,
+        )
 
     # Start and end dates of cross-validation folds
     fold_dates = (
@@ -476,7 +485,9 @@ def plot_error_over_time(error_df, error_name, metric, area, error_horizons):
     ax.grid()
 
 
-def plot_error_boxplot(error_df, error_name, metric, area):
+def plot_error_boxplot(
+    error_df, error_name, metric, area, ax=None, title=None
+):
     """Plot cross-validation error distributions by forecast horizon.
 
     Parameters
@@ -489,6 +500,10 @@ def plot_error_boxplot(error_df, error_name, metric, area):
         Name of ambulance metric to plot.
     area : str
         Name of area to plot.
+    ax : matplotlib.axes.Axes | None
+        Axis to plot on.
+    title : str | None
+        Title for the plot.
 
     Returns
     -------
@@ -510,7 +525,8 @@ def plot_error_boxplot(error_df, error_name, metric, area):
         for horizon in horizons
     ]
 
-    _, ax = plt.subplots(figsize=(10, 5))
+    if ax is None:
+        _, ax = plt.subplots(figsize=(10, 5))
 
     if error_name == "coverage":
         ax.axhline(
@@ -527,7 +543,122 @@ def plot_error_boxplot(error_df, error_name, metric, area):
 
     ax.set_xlabel("Forecast horizon")
     ax.set_ylabel(error_name)
-    ax.set_title(f"{error_name} {metric} {area}")
     ax.grid(axis="y")
 
+    if title is None:
+        ax.set_title(f"{error_name} {metric} {area}")
+    else:
+        ax.set_title(title)
+
     return ax
+
+
+def get_mean_ci(values):
+    """Calculate mean, and lower and upper 95% confidence interval bounds.
+
+    Parameters
+    ----------
+    values : pd.Series
+        Values to run calculation on.
+
+    """
+    values = values.dropna()
+    if len(values) < 2:
+        return pd.Series(
+            {
+                "mean": values.mean(),
+                "n_folds": len(values),
+                "lower": float("nan"),
+                "upper": float("nan"),
+            }
+        )
+
+    result = ttest_1samp(values, popmean=0)
+    ci = result.confidence_interval(confidence_level=0.95)
+
+    return pd.Series(
+        {
+            "mean": values.mean(),
+            "lower": ci.low,
+            "upper": ci.high,
+        }
+    )
+
+
+def plot_error_by_area_and_horizon(error_df, error_metric):
+    """Plot error metric by area and horizon.
+
+    Parameters
+    ----------
+    error_df : pd.DataFrame
+        Single dataframe with errors from multiple models.
+    error_metric : str
+        Name of error metric to plot.
+
+    """
+    # Find areas
+    areas = error_df["area"].unique()
+
+    # Calculate mean and 95% confidence interval across folds
+    summary = (
+        error_df.groupby(["model", "area", "horizon"])[error_metric]
+        .apply(get_mean_ci)
+        .unstack()
+        .reset_index()
+    )
+
+    ncols = ncols = min(2, len(areas))
+    nrows = math.ceil(len(areas) / ncols)
+    fig, axes = plt.subplots(
+        ncols=ncols,
+        nrows=nrows,
+        figsize=(5 * ncols, 3 * nrows),
+        squeeze=False,
+    )
+
+    for ax, area in zip(axes.flat, areas, strict=False):
+        area_data = summary[summary["area"] == area]
+        for model, plot_data in area_data.groupby("model"):
+            plot_data = plot_data.sort_values("horizon")
+
+            (line,) = ax.plot(
+                plot_data["horizon"],
+                plot_data["mean"],
+                marker="o",
+                markersize=4,
+                label=model,
+            )
+            ax.fill_between(
+                plot_data["horizon"],
+                plot_data["lower"],
+                plot_data["upper"],
+                color=line.get_color(),
+                alpha=0.15,
+            )
+            ax.set_xticks([7, 14, 21, 28, 35, 42])
+            ax.set_title(area)
+            ax.grid(alpha=0.25)
+
+    for ax in axes[:, 0]:
+        ax.set_ylabel(error_metric)
+
+    for ax in axes[-1, :]:
+        ax.set_xlabel("Horizon (days)")
+
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        ncol=2,
+        frameon=False,
+        bbox_to_anchor=(0.5, -0.02),
+    )
+
+    # Hide any unused axes
+    for ax in axes.flat[len(areas) :]:
+        ax.set_visible(False)
+
+    plt.tight_layout()
+    plt.show()

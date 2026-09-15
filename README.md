@@ -1,7 +1,7 @@
 # ambforecast: open reproducible forecasts of ambulance incidents, calls and responses
 
 <!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-4-orange.svg?style=flat-square)](#contributors-)
+[![All Contributors](https://img.shields.io/badge/all_contributors-5-orange.svg?style=flat-square)](#contributors-)
 <!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 Documentation: <https://ambmodels.github.io/ambforecast/>
@@ -115,8 +115,6 @@ If you use this repository, please cite us:
 
 ## Contributors ✨
 
-TODO: Add Irene once receive GitHub username.
-
 Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
 
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
@@ -128,6 +126,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center" valign="top" width="14.28%"><a href="https://www.linkedin.com/in/amyheather"><img src="https://avatars.githubusercontent.com/u/92166537?v=4?s=100" width="100px;" alt="Amy Heather"/><br /><sub><b>Amy Heather</b></sub></a><br /><a href="https://github.com/ambmodels/ambforecast/commits?author=amyheather" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://experts.exeter.ac.uk/19244-thomas-monks"><img src="https://avatars.githubusercontent.com/u/881493?v=4?s=100" width="100px;" alt="Tom Monks"/><br /><sub><b>Tom Monks</b></sub></a><br /><a href="https://github.com/ambmodels/ambforecast/commits?author=TomMonks" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/LeeCoulsonNHS"><img src="https://avatars.githubusercontent.com/u/112544587?v=4?s=100" width="100px;" alt="LeeCoulsonNHS"/><br /><sub><b>LeeCoulsonNHS</b></sub></a><br /><a href="https://github.com/ambmodels/ambforecast/commits?author=LeeCoulsonNHS" title="Code">💻</a> <a href="#data-LeeCoulsonNHS" title="Data">🔣</a> <a href="#ideas-LeeCoulsonNHS" title="Ideas, Planning, & Feedback">🤔</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Irene-Irungu"><img src="https://avatars.githubusercontent.com/u/318161052?v=4?s=100" width="100px;" alt="Irene Irungu"/><br /><sub><b>Irene Irungu</b></sub></a><br /><a href="https://github.com/ambmodels/ambforecast/commits?author=Irene-Irungu" title="Code">💻</a> <a href="#data-Irene-Irungu" title="Data">🔣</a> <a href="#ideas-Irene-Irungu" title="Ideas, Planning, & Feedback">🤔</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://www.linkedin.com/in/robchallen"><img src="https://avatars.githubusercontent.com/u/16591648?v=4?s=100" width="100px;" alt="Rob Challen"/><br /><sub><b>Rob Challen</b></sub></a><br /><a href="#ideas-robchallen" title="Ideas, Planning, & Feedback">🤔</a></td>
     </tr>
   </tbody>

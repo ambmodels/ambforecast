@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import pandas as pd
 from forecast_tools.baseline import SNaive
 
-from .structures import CustomRepr
+from .helpers import CustomRepr
 
 
 @dataclass(kw_only=True, repr=False)

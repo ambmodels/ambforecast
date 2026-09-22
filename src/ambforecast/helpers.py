@@ -1,4 +1,4 @@
-"""Structures used in code."""
+"""Helpers."""
 
 from dataclasses import fields
 
@@ -36,3 +36,41 @@ class CustomRepr:
         for field in fields(self):
             value = getattr(self, field.name)
             yield field.name, self._format_value(value)
+
+
+def merge_regressor(data, regressor):
+    """Merge a regressor and check it covers required dates and area.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Data containing `ds` and `area` columns.
+    regressor : ProphetRegressor
+        Regressor configuration and data.
+
+    Returns
+    -------
+    data : pd.DataFrame
+        Data with the regressor column added.
+
+    """
+    data = pd.merge(
+        data,
+        regressor.data[["ds", "area", regressor.name]],
+        on=["ds", "area"],
+        how="left",
+        validate="one_to_one",
+    )
+
+    missing = data.loc[
+        data[regressor.name].isna(),
+        ["ds", "area"],
+    ]
+
+    if not missing.empty:
+        raise ValueError(
+            f"Regressor {regressor.name!r} has missing values for:\n"
+            f"{missing.to_string(index=False)}"
+        )
+
+    return data

@@ -6,7 +6,7 @@ import pandas as pd
 from rich import print
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel
 
-from .structures import CustomRepr
+from .helpers import CustomRepr
 
 
 @dataclass(kw_only=True, repr=False)

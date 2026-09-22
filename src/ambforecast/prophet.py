@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from prophet import Prophet
 
-from .structures import CustomRepr
+from .helpers import CustomRepr, merge_regressor
 
 
 @dataclass(kw_only=True, repr=False)
@@ -116,44 +116,6 @@ class ProphetParams(CustomRepr):
     plot_components: bool = False
 
 
-def merge_prophet_regressor(data, regressor):
-    """Merge a regressor and check it covers required dates and area.
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        Data containing `ds` and `area` columns.
-    regressor : ProphetRegressor
-        Regressor configuration and data.
-
-    Returns
-    -------
-    data : pd.DataFrame
-        Data with the regressor column added.
-
-    """
-    data = pd.merge(
-        data,
-        regressor.data[["ds", "area", regressor.name]],
-        on=["ds", "area"],
-        how="left",
-        validate="one_to_one",
-    )
-
-    missing = data.loc[
-        data[regressor.name].isna(),
-        ["ds", "area"],
-    ]
-
-    if not missing.empty:
-        raise ValueError(
-            f"Regressor {regressor.name!r} has missing values for:\n"
-            f"{missing.to_string(index=False)}"
-        )
-
-    return data
-
-
 def prophet(train, params, test=None, horizon=None, seed=None):
     """Fit Prophet model and generate forecast.
 
@@ -209,7 +171,7 @@ def prophet(train, params, test=None, horizon=None, seed=None):
     # Add regressor data to the training data and add them to the model
     # Will only run loop if regressors are provided
     for regressor in params.regressors:
-        train = merge_prophet_regressor(data=train, regressor=regressor)
+        train = merge_regressor(data=train, regressor=regressor)
         model.add_regressor(
             name=regressor.name,
             prior_scale=regressor.prior_scale,
@@ -233,7 +195,7 @@ def prophet(train, params, test=None, horizon=None, seed=None):
     # Add regressor data to the future dataframe
     # Will only run loop if regressors are provided
     for regressor in params.regressors:
-        future = merge_prophet_regressor(data=future, regressor=regressor)
+        future = merge_regressor(data=future, regressor=regressor)
 
     # Generate forecast
     forecast = model.predict(future)

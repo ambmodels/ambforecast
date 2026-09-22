@@ -8,7 +8,7 @@ import statsmodels.api as sm
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 from threadpoolctl import threadpool_limits
 
-from .structures import CustomRepr
+from .helpers import CustomRepr, merge_regressor
 
 
 @dataclass(kw_only=True, repr=False)
@@ -71,64 +71,44 @@ class ARIMAParams(CustomRepr):
     interval_width: float = 0.95
 
 
-def encode_holidays(dates, holiday_dates):
+def encode_holidays(dates, holidays):
     """Create dataframe with encoded holidays for ARIMA.
 
     Parameters
     ----------
-    dates : pd.Series | pd.Index
-        Dates in the data that is being fit or predicted.
-    holiday_dates : pd.Series | pd.Index
-        Dates that holidays are on.
+    dates : pd.Series
+        Dates in the data that is being fit and predicted.
+    holidays : pd.DataFrame
+        Holiday dataframe.
 
     Returns
     -------
     pd.DataFrame
-        Dataframe with `ds` and binary `holiday` column.
+        Dataframe with `ds` , `area` and binary `holiday` column.
 
     """
-    dates = pd.DatetimeIndex(dates)
-    return pd.DataFrame(
-        {
-            "ds": dates,
-            "holiday": dates.isin(holiday_dates).astype(int),
-        }
+    # Get a list of all areas
+    areas = holidays["area"].unique()
+
+    # Build one row for every date x area combination
+    date_area_grid = pd.MultiIndex.from_product(
+        [dates, areas],
+        names=["ds", "area"]
+    ).to_frame(index=False)
+
+    # Convert holiday data to a binary indicator of date x area with holiday
+    holiday_flag = (
+        holidays
+        .assign(holiday=1)[["ds", "holiday", "area"]]
+        .drop_duplicates()
     )
 
-
-def merge_arima_regressor(data, regressor):
-    """Merge a regressor and check it covers required dates.
-
-    Parameters
-    ----------
-    data : pd.DataFrame
-        Data containing `ds` column.
-    regressor : ProphetRegressor
-        Regressor configuration and data.
-
-    Returns
-    -------
-    data : pd.DataFrame
-        Data with the regressor column added.
-
-    """
-    data = pd.merge(
-        data,
-        regressor.data[["ds", regressor.name]],
-        on=["ds"],
-        how="left",
-        validate="one_to_one",
-    )
-
-    missing = data.loc[data[regressor.name].isna(), ["ds"]]
-
-    if not missing.empty:
-        raise ValueError(
-            f"Regressor {regressor.name!r} has missing values for:\n"
-            f"{missing.to_string(index=False)}"
-        )
-
-    return data
+    # Add flags to every date x area row - dates absent from holiday become 0
+    return date_area_grid.merge(
+        holiday_flag,
+        on=["ds", "area"],
+        how="left"
+    ).fillna({"holiday": 0}).astype({"holiday": int})
 
 
 def arima(train, params, test=None, horizon=None):
@@ -183,7 +163,7 @@ def arima(train, params, test=None, horizon=None):
         holiday = ARIMARegressor(
             name="holiday",
             data=encode_holidays(
-                dates=all_dates, holiday_dates=params.holidays["ds"]
+                dates=all_dates, holidays=params.holidays
             ),
         )
         regressors = (*params.regressors, holiday)
@@ -191,7 +171,7 @@ def arima(train, params, test=None, horizon=None):
     # Add regressor data to the training data
     # Will only run loop if regressors are provided
     for regressor in regressors:
-        train = merge_arima_regressor(data=train, regressor=regressor)
+        train = merge_regressor(data=train, regressor=regressor)
 
     # Construct dataframe of exogenous regressors
     regressor_names = [regressor.name for regressor in regressors]
@@ -224,7 +204,7 @@ def arima(train, params, test=None, horizon=None):
 
     # Add regressor data to test data
     for regressor in regressors:
-        future = merge_arima_regressor(data=future, regressor=regressor)
+        future = merge_regressor(data=future, regressor=regressor)
 
     # Construct dataframe of exogneous regressors
     if regressor_names:

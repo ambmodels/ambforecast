@@ -143,14 +143,25 @@ def arima(train, params, test=None, horizon=None):
 
     # Create index of dates to make prediction for
     if test is not None:
-        future = test[["ds"]].copy()
+        future = test[["ds", "area"]].copy()
     else:
         forecast_dates = pd.date_range(
             start=arima_train.index.max() + pd.Timedelta(days=1),
             periods=horizon,
             freq="D",
         )
-        future = pd.DataFrame({"ds": forecast_dates})
+        areas = train["area"].dropna().unique()
+        if len(areas) != 1:
+            raise ValueError(
+                "ARIMA horizon forecasts require training data for exactly "
+                f"one area. Found: {areas.tolist()}"
+            )
+        future = pd.DataFrame(
+            {
+                "ds": forecast_dates,
+                "area": areas[0],
+            }
+        )
 
     # Create dataframe where index is each date from the training data and
     # column is "holiday" which is 1 when the date is listed as a holiday and

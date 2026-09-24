@@ -41,10 +41,14 @@ class CustomRepr:
 def merge_regressor(data, regressor):
     """Merge a regressor and check it covers required dates and area.
 
+    A regressor with an `area` column is area-specific and is merged on
+    `ds` and `area`. A regressor without an `area` column is shared
+    across all areas and is merged on `ds` only.
+
     Parameters
     ----------
     data : pd.DataFrame
-        Data containing `ds` and `area` columns.
+        Data with columns: `ds` (mandatory), `area` (optional).
     regressor : ProphetRegressor
         Regressor configuration and data.
 
@@ -54,17 +58,19 @@ def merge_regressor(data, regressor):
         Data with the regressor column added.
 
     """
+    merge_on = ["ds", "area"] if "area" in regressor.data.columns else ["ds"]
+
     data = pd.merge(
         data,
-        regressor.data[["ds", "area", regressor.name]],
-        on=["ds", "area"],
+        regressor.data[[*merge_on, regressor.name]],
+        on=merge_on,
         how="left",
         validate="one_to_one",
     )
 
     missing = data.loc[
         data[regressor.name].isna(),
-        ["ds", "area"],
+        merge_on,
     ]
 
     if not missing.empty:

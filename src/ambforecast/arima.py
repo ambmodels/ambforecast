@@ -38,9 +38,12 @@ class ARIMAParams(CustomRepr):
     holidays : pd.DataFrame | None
         Holiday dataframe. If None, no holiday effects are fitted.
     order : tuple
-        The (p, d, q) order of the model.
+        The (p, d, q) order of the model. Default is values from Monks et al.
+        2023: (1, 1, 3). This differs from ARIMA's default (0, 0, 0).
     seasonal_order : tuple
-        The (P, D, Q, s) order of the seasonal component of the model.
+        The (P, D, Q, s) order of the seasonal component of the model. Default
+        is values from Monks et al. 2023: (1, 0, 1, 7). This differs from
+        ARIMA's default (0, 0, 0, 0).
     enforce_stationarity : bool
         Whether or not to require the autoregressive parameters to correspond
         to a stationarity process.
@@ -57,16 +60,10 @@ class ARIMAParams(CustomRepr):
     """
 
     holidays: pd.DataFrame | None = None
-
-    # ARIMA default
-    order: tuple = (0, 0, 0)
-    # ARIMA default
-    seasonal_order: tuple = (0, 0, 0, 0)
-    # ARIMA default
-    enforce_stationarity: bool = True
-    # ARIMA default
-    max_iter: int = 50
-
+    order: tuple = (1, 1, 3)
+    seasonal_order: tuple = (1, 0, 1, 7)
+    enforce_stationarity: bool = False
+    max_iter: int = 100
     regressors: tuple[ARIMARegressor, ...] = ()
     interval_width: float = 0.95
 
@@ -92,23 +89,20 @@ def encode_holidays(dates, holidays):
 
     # Build one row for every date x area combination
     date_area_grid = pd.MultiIndex.from_product(
-        [dates, areas],
-        names=["ds", "area"]
+        [dates, areas], names=["ds", "area"]
     ).to_frame(index=False)
 
     # Convert holiday data to a binary indicator of date x area with holiday
-    holiday_flag = (
-        holidays
-        .assign(holiday=1)[["ds", "holiday", "area"]]
-        .drop_duplicates()
-    )
+    holiday_flag = holidays.assign(holiday=1)[
+        ["ds", "holiday", "area"]
+    ].drop_duplicates()
 
     # Add flags to every date x area row - dates absent from holiday become 0
-    return date_area_grid.merge(
-        holiday_flag,
-        on=["ds", "area"],
-        how="left"
-    ).fillna({"holiday": 0}).astype({"holiday": int})
+    return (
+        date_area_grid.merge(holiday_flag, on=["ds", "area"], how="left")
+        .fillna({"holiday": 0})
+        .astype({"holiday": int})
+    )
 
 
 def arima(train, params, test=None, horizon=None):
@@ -173,9 +167,7 @@ def arima(train, params, test=None, horizon=None):
     else:
         holiday = ARIMARegressor(
             name="holiday",
-            data=encode_holidays(
-                dates=all_dates, holidays=params.holidays
-            ),
+            data=encode_holidays(dates=all_dates, holidays=params.holidays),
         )
         regressors = (*params.regressors, holiday)
 

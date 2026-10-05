@@ -101,6 +101,12 @@ reference:
       - splits.train_test_split
       - splits.rolling_forecast_origin
 
+  - title: COVID
+    desc: Functions for amending data to help mitigate impact of COVID.
+    contents:
+      - covid.create_dummy
+      - covid.naivefill_prior_year
+
   - title: ARIMA
     desc: Configure and run ARIMA forecasts.
     contents:

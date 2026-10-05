@@ -1,6 +1,31 @@
 """Functions to support handling COVID-19 period."""
 
 
+def create_dummy(df_historic, start_date, end_date, dummy_name):
+    """Create a dummy variable for df_historic between two dates.
+
+    Parameters
+    ----------
+    df_historic : pd.DataFrame
+        Historic data.
+    start_date : pd.Timestamp
+        First date to replace, inclusive.
+    end_date : pd.Timestamp
+        Last date to replace, inclusive.
+    dummy_name : str
+        Name for the dummy variable.
+
+    Returns
+    -------
+    dummy : pd.DataFrame
+        Dataframe with each date and area from `df_historic`, plus a dummy
+        indicator marked as 1 if between dates and otherwise 0.
+
+    """
+    dummy = df_historic[["ds", "area"]].drop_duplicates()
+    dummy[dummy_name] = dummy["ds"].between(start_date, end_date).astype(int)
+    return dummy
+
 
 def naivefill_prior_year(df_historic, start_date, end_date):
     """Replace values between two dates based on same date in prior year.

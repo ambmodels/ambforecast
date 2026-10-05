@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+import numpy as np
 import pandas as pd
 from rich import print
 from statsmodels.tsa.exponential_smoothing.ets import ETSModel
@@ -43,7 +44,7 @@ class ETSParams(CustomRepr):
     interval_width: float = 0.95
 
 
-def ets(train, params, test=None, horizon=None, verbose=False):
+def ets(train, params, test=None, horizon=None, verbose=False, seed=None):
     """Fit exponential smoothing model and generate forecast.
 
     Parameters
@@ -61,6 +62,9 @@ def ets(train, params, test=None, horizon=None, verbose=False):
         with no data to compare against).
     verbose : bool
         Whether to print the chosen parameter values
+    seed : int | None
+        Random seed (as randomness is used for multiplicative when estimating
+        prediction intervals, so a seed is needed to make them reproducible).
 
     Returns
     -------
@@ -70,6 +74,9 @@ def ets(train, params, test=None, horizon=None, verbose=False):
     """
     if (test is None) == (horizon is None):
         raise ValueError("Provide exactly one of 'test' or 'horizon'.")
+
+    if seed is not None:
+        np.random.seed(seed)
 
     # Convert training data into required format
     train = train.sort_values("ds").set_index("ds")["y"]

@@ -12,6 +12,7 @@ from forecast_tools.metrics import (
 from joblib import Parallel, delayed, effective_n_jobs
 from tqdm.auto import tqdm
 
+from .ets import ets
 from .prophet import prophet
 from .splits import rolling_forecast_origin
 
@@ -156,7 +157,7 @@ def run_single_forecast(
         "horizon": horizon,
     }
     # Uses metric and area if seed_parts = None
-    if forecast_function is prophet:
+    if forecast_function in (prophet, ets):
         seed_parts = seed_parts or (metric, area)
         forecast_kwargs["seed"] = make_seed(*seed_parts)
 

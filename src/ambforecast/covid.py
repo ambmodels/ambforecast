@@ -1,8 +1,10 @@
 """Functions to support handling COVID-19 period."""
 
+import pandas as pd
 
-def create_dummy(df_historic, start_date, end_date, dummy_name):
-    """Create a dummy variable for df_historic between two dates.
+
+def create_dummy(df_historic, start_date, end_date, dummy_name, horizon=0):
+    """Create a dummy variable for historic and optional future dates.
 
     Parameters
     ----------
@@ -14,15 +16,36 @@ def create_dummy(df_historic, start_date, end_date, dummy_name):
         Last date to replace, inclusive.
     dummy_name : str
         Name for the dummy variable.
+    horizon : int
+        Planned forecast horizon, as will require dummy for those dates too.
 
     Returns
     -------
     dummy : pd.DataFrame
-        Dataframe with each date and area from `df_historic`, plus a dummy
-        indicator marked as 1 if between dates and otherwise 0.
+        Dataframe with each date (+ horizon) and area from `df_historic`, plus
+        a dummy indicator marked as 1 if between dates and otherwise 0.
 
     """
+    # Get unique dates and areas
     dummy = df_historic[["ds", "area"]].drop_duplicates()
+
+    # Extend date and area combinations into horizon
+    if horizon:
+        future_rows = []
+
+        for area, group in dummy.groupby("area"):
+            dates = pd.date_range(
+                start=group["ds"].max() + pd.Timedelta(days=1),
+                periods=horizon,
+                freq="D",
+            )
+            future_rows.append(
+                pd.DataFrame({"ds": dates, "area": area})
+            )
+
+        dummy = pd.concat([dummy, *future_rows], ignore_index=True)
+
+    # Generate dummy variable
     dummy[dummy_name] = dummy["ds"].between(start_date, end_date).astype(int)
     return dummy
 
